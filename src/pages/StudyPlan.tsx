@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Container,
@@ -54,9 +54,14 @@ import {
   CardHeader,
   CardFooter,
   Tooltip,
-  useDisclosure as useDisclosure2
+  useDisclosure as useDisclosure2,
+  Grid,
+  Center,
+  ButtonGroup,
+  IconButton,
+  useColorMode
 } from '@chakra-ui/react';
-import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck } from 'react-icons/fa';
+import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause } from 'react-icons/fa';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -70,7 +75,8 @@ import {
   deleteDoc,
   doc,
   updateDoc,
-  orderBy
+  orderBy,
+  getDoc
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -123,10 +129,10 @@ type DailySchedule = {
     startTime: string;
     endTime: string;
     duration: number; // in minutes
-    completed: boolean;
   }[];
   totalStudyTime: number;
   createdAt: any;
+  userId: string;
 };
 
 // Enhanced types for next-gen scheduling
@@ -155,7 +161,26 @@ type LearningPattern = {
   breakAfter: number;
 };
 
+// Add new type for schedule display
+type ScheduleDisplay = {
+  isVisible: boolean;
+  date: string;
+  schedule: DailySchedule | null;
+};
+
+// Add new type for study session
+type StudySession = {
+  id: string;
+  subjectId: string;
+  startTime: Date;
+  endTime?: Date;
+  duration: number;
+  status: 'active' | 'paused' | 'completed';
+  currentSubject: string;
+};
+
 const StudyPlan = () => {
+  // All useState hooks
   const [courses, setCourses] = useState<Course[]>([]);
   const [newCourse, setNewCourse] = useState('');
   const [description, setDescription] = useState('');
@@ -181,9 +206,6 @@ const StudyPlan = () => {
   const [color, setColor] = useState('#3182CE');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const toast = useToast();
-  const { currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<'priority' | 'progress' | 'name'>('priority');
   const [filterPriority, setFilterPriority] = useState<'all' | 'high' | 'medium' | 'low'>('all');
@@ -192,9 +214,28 @@ const StudyPlan = () => {
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [dailySchedule, setDailySchedule] = useState<DailySchedule | null>(null);
   const [isGeneratingSchedule, setIsGeneratingSchedule] = useState(false);
-  const { isOpen: isScheduleModalOpen, onOpen: onScheduleModalOpen, onClose: onScheduleModalClose } = useDisclosure2();
+  const [scheduleDisplay, setScheduleDisplay] = useState<ScheduleDisplay>({
+    isVisible: false,
+    date: '',
+    schedule: null
+  });
+  const [currentSession, setCurrentSession] = useState<StudySession | null>(null);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
 
-  // Enhanced energy levels with activity recommendations
+  // All useRef hooks
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // All useDisclosure hooks
+  const addCourseModal = useDisclosure();
+  const scheduleModal = useDisclosure2();
+
+  // All useContext hooks
+  const toast = useToast();
+  const { currentUser } = useAuth();
+  const { colorMode } = useColorMode();
+
+  // Constants
   const dailyEnergyLevels: EnergyLevel[] = [
     {
       time: '06:00',
@@ -240,7 +281,6 @@ const StudyPlan = () => {
     }
   ];
 
-  // Learning patterns for different types of subjects
   const learningPatterns: Record<string, LearningPattern> = {
     theory: {
       type: 'reading',
@@ -262,7 +302,7 @@ const StudyPlan = () => {
     }
   };
 
-  // Fetch courses when component mounts
+  // All useEffect hooks
   useEffect(() => {
     if (!currentUser) {
       console.log('No user logged in');
@@ -298,6 +338,28 @@ const StudyPlan = () => {
       unsubscribe();
     };
   }, [currentUser]);
+
+  // Timer effect
+  useEffect(() => {
+    if (currentSession?.status === 'active' && !isPaused) {
+      timerRef.current = setInterval(() => {
+        setElapsedTime(prev => prev + 1);
+      }, 1000);
+    }
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, [currentSession?.status, isPaused]);
+
+  // Format time for display
+  const formatTime = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = seconds % 60;
+    return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
 
   const handleAddCourse = async () => {
     if (!currentUser) {
@@ -371,7 +433,7 @@ const StudyPlan = () => {
         sessionsUntilLongBreak: 4
       });
       setColor('#3182CE');
-      onClose();
+      addCourseModal.onClose();
 
       toast({
         title: 'Success',
@@ -538,7 +600,7 @@ const StudyPlan = () => {
     const minute = currentTime.getMinutes();
     const timeString = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
 
-    return dailyEnergyLevels.reduce((optimal, current) => {
+    return dailyEnergyLevels.reduce((optimal: EnergyLevel, current: EnergyLevel) => {
       const currentTimeValue = timeToMinutes(timeString);
       const optimalTimeValue = timeToMinutes(current.time);
       const timeDiff = Math.abs(currentTimeValue - optimalTimeValue);
@@ -584,10 +646,21 @@ const StudyPlan = () => {
 
   // Enhanced schedule generation with next-gen algorithm
   const generateDailySchedule = async () => {
-    if (!selectedDate || selectedSubjects.length === 0) {
+    if (!currentUser) {
       toast({
         title: 'Error',
-        description: 'Please select a date and at least one subject',
+        description: 'Please log in to generate a schedule',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    if (selectedSubjects.length === 0) {
+      toast({
+        title: 'Error',
+        description: 'Please select at least one subject',
         status: 'error',
         duration: 3000,
         isClosable: true,
@@ -597,9 +670,18 @@ const StudyPlan = () => {
 
     setIsGeneratingSchedule(true);
     try {
+      console.log('Starting schedule generation...');
+      console.log('Selected subjects:', selectedSubjects);
+
       const selectedCoursesData = courses.filter(course => 
         selectedSubjects.includes(course.id)
       );
+
+      console.log('Selected courses data:', selectedCoursesData);
+
+      if (selectedCoursesData.length === 0) {
+        throw new Error('No valid subjects found');
+      }
 
       // Enhanced subject sorting with multiple factors
       const sortedSubjects = [...selectedCoursesData].sort((a, b) => {
@@ -614,66 +696,111 @@ const StudyPlan = () => {
         return bScore - aScore;
       });
 
+      console.log('Sorted subjects:', sortedSubjects);
+
+      // Generate schedule starting from 8 AM
+      let currentTime = new Date();
+      currentTime.setHours(8, 0, 0, 0);
+
+      const scheduleId = Date.now().toString();
+      console.log('Generated schedule ID:', scheduleId);
+
       const schedule: DailySchedule = {
-        id: Date.now().toString(),
-        date: selectedDate,
+        id: scheduleId,
+        date: new Date().toISOString().split('T')[0],
         subjects: [],
         totalStudyTime: 0,
-        createdAt: serverTimestamp()
+        createdAt: serverTimestamp(),
+        userId: currentUser.uid
       };
 
-      let currentTime = new Date(`${selectedDate}T08:00:00`);
       let totalStudyTime = 0;
-      let previousSlots: TimeSlot[] = [];
 
-      // Generate enhanced schedule
+      // Generate schedule for each subject
       for (const subject of sortedSubjects) {
-        const timeSlots = calculateOptimalStudyTime(subject, currentTime, previousSlots);
+        console.log('Processing subject:', subject.name);
         
-        // Add study slot
-        const studySlot = timeSlots.find(slot => slot.type === 'study');
-        if (studySlot) {
-          schedule.subjects.push({
-            subjectId: subject.id,
-            name: subject.name,
-            startTime: studySlot.startTime,
-            endTime: studySlot.endTime,
-            duration: (subject.dailyStudyTime?.hours || 0) * 60 + (subject.dailyStudyTime?.minutes || 30),
-            completed: false
-          });
+        // Calculate duration in minutes with fallback values
+        const hours = subject.dailyStudyTime?.hours || 0;
+        const minutes = subject.dailyStudyTime?.minutes || 30;
+        const duration = (hours * 60) + minutes;
+        
+        console.log('Subject duration:', duration, 'minutes');
 
-          totalStudyTime += studySlot.duration || 0;
-          currentTime = new Date(`${selectedDate}T${studySlot.endTime}`);
-          previousSlots = timeSlots;
-        }
+        // Create end time
+        const endTime = new Date(currentTime.getTime() + duration * 60000);
+
+        // Add subject to schedule
+        schedule.subjects.push({
+          subjectId: subject.id,
+          name: subject.name,
+          startTime: currentTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          endTime: endTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          duration: duration,
+        });
+
+        totalStudyTime += duration;
+        
+        // Add 15-minute break after each subject
+        currentTime = new Date(endTime.getTime() + 15 * 60000);
       }
 
       schedule.totalStudyTime = totalStudyTime;
-      setDailySchedule(schedule);
-      onScheduleModalOpen();
+      console.log('Generated schedule:', schedule);
 
-      // Enhanced AI study tips
-      const tips = generateEnhancedStudyTips(sortedSubjects, schedule);
-      toast({
-        title: 'AI Study Tips',
-        description: tips,
-        status: 'info',
-        duration: 5000,
-        isClosable: true,
+      // Save schedule to Firebase with updated collection path
+      console.log('Saving schedule to Firebase...');
+      const scheduleRef = collection(db, 'user_study_plans', currentUser.uid, 'schedules');
+      const docRef = await addDoc(scheduleRef, schedule);
+      console.log('Schedule saved with ID:', docRef.id);
+
+      // Update schedule display
+      setScheduleDisplay({
+        isVisible: true,
+        date: schedule.date,
+        schedule: schedule
       });
 
-    } catch (error) {
-      console.error('Error generating schedule:', error);
+      // Show success message
       toast({
-        title: 'Error',
-        description: 'Failed to generate schedule. Please try again.',
-        status: 'error',
+        title: 'Schedule Generated',
+        description: `Created schedule with ${sortedSubjects.length} subjects`,
+        status: 'success',
         duration: 3000,
         isClosable: true,
       });
+
+    } catch (error: any) {
+      console.error('Error generating schedule:', error);
+      if (error.code === 'permission-denied') {
+        toast({
+          title: 'Permission Error',
+          description: 'Please check your Firebase security rules',
+          status: 'error',
+          duration: 5000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to generate schedule. Please try again.',
+          status: 'error',
+          duration: 3000,
+          isClosable: true,
+        });
+      }
     } finally {
       setIsGeneratingSchedule(false);
     }
+  };
+
+  // Load a saved schedule
+  const loadSavedSchedule = (schedule: DailySchedule) => {
+    setScheduleDisplay({
+      isVisible: true,
+      date: schedule.date,
+      schedule: schedule
+    });
   };
 
   // Generate enhanced study tips
@@ -724,21 +851,90 @@ const StudyPlan = () => {
     return tips.join('\n');
   };
 
-  // Function to mark subject as completed
-  const toggleSubjectCompletion = (subjectId: string) => {
-    if (!dailySchedule) return;
+  // Start study session
+  const startStudySession = (subject: { subjectId: string; name: string }) => {
+    if (currentSession) {
+      // If there's an active session, stop it first
+      stopStudySession();
+    }
+    
+    const newSession: StudySession = {
+      id: Date.now().toString(),
+      subjectId: subject.subjectId,
+      startTime: new Date(),
+      duration: 0,
+      status: 'active',
+      currentSubject: subject.name
+    };
+    
+    setCurrentSession(newSession);
+    setElapsedTime(0);
+    setIsPaused(false);
+  };
 
-    setDailySchedule(prev => {
-      if (!prev) return null;
-      return {
-        ...prev,
-        subjects: prev.subjects.map(subject =>
-          subject.subjectId === subjectId
-            ? { ...subject, completed: !subject.completed }
-            : subject
-        )
+  // Pause study session
+  const pauseStudySession = () => {
+    if (currentSession && currentSession.status === 'active') {
+      setCurrentSession(prev => prev ? { ...prev, status: 'paused' } : null);
+      setIsPaused(true);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
+  };
+
+  // Resume study session
+  const resumeStudySession = () => {
+    if (currentSession && currentSession.status === 'paused') {
+      setCurrentSession(prev => prev ? { ...prev, status: 'active' } : null);
+      setIsPaused(false);
+    }
+  };
+
+  // Stop study session
+  const stopStudySession = async () => {
+    if (currentSession) {
+      const endTime = new Date();
+      const duration = Math.floor((endTime.getTime() - currentSession.startTime.getTime()) / 1000);
+      
+      const completedSession = {
+        ...currentSession,
+        endTime,
+        duration,
+        status: 'completed' as const
       };
-    });
+
+      // Save session data to Firebase
+      if (currentUser) {
+        try {
+          await addDoc(
+            collection(db, 'user_study_plans', currentUser.uid, 'study_sessions'),
+            {
+              ...completedSession,
+              createdAt: serverTimestamp()
+            }
+          );
+
+          // Update subject progress
+          const subjectRef = doc(db, 'user_study_plans', currentUser.uid, 'courses', currentSession.subjectId);
+          const subjectDoc = await getDoc(subjectRef);
+          if (subjectDoc.exists()) {
+            const currentProgress = subjectDoc.data().progress || 0;
+            const newProgress = Math.min(100, currentProgress + 5); // Increase progress by 5%
+            await updateDoc(subjectRef, { progress: newProgress });
+          }
+        } catch (error) {
+          console.error('Error saving study session:', error);
+        }
+      }
+
+      setCurrentSession(null);
+      setElapsedTime(0);
+      setIsPaused(false);
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    }
   };
 
   return (
@@ -769,7 +965,7 @@ const StudyPlan = () => {
                 <Button 
                   leftIcon={<FaPlus />} 
                   colorScheme="blue" 
-                  onClick={onOpen}
+                  onClick={addCourseModal.onOpen}
                   isLoading={isLoading}
                 >
                   Add Subject
@@ -850,52 +1046,179 @@ const StudyPlan = () => {
                 <VStack spacing={6} align="stretch">
                   <Heading size="lg">Daily Study Planner</Heading>
                   
-                  <Card>
-                    <CardBody>
-                      <VStack spacing={4}>
-                        <FormControl>
-                          <FormLabel>Select Date</FormLabel>
-                          <Input
-                            type="date"
-                            value={selectedDate}
-                            onChange={(e) => setSelectedDate(e.target.value)}
-                          />
-                        </FormControl>
+                  <Grid templateColumns="repeat(2, 1fr)" gap={6}>
+                    {/* Left Column - Subject Selection */}
+                    <Box>
+                      <Card>
+                        <CardBody>
+                          <VStack spacing={4}>
+                            <FormControl>
+                              <FormLabel>Select Subjects</FormLabel>
+                              <List spacing={2}>
+                                {courses.map(course => (
+                                  <ListItem key={course.id}>
+                                    <Checkbox
+                                      isChecked={selectedSubjects.includes(course.id)}
+                                      onChange={(e) => {
+                                        if (e.target.checked) {
+                                          setSelectedSubjects([...selectedSubjects, course.id]);
+                                        } else {
+                                          setSelectedSubjects(selectedSubjects.filter(id => id !== course.id));
+                                        }
+                                      }}
+                                    >
+                                      {course.name}
+                                    </Checkbox>
+                                  </ListItem>
+                                ))}
+                              </List>
+                            </FormControl>
 
-                        <FormControl>
-                          <FormLabel>Select Subjects</FormLabel>
-                          <List spacing={2}>
-                            {courses.map(course => (
-                              <ListItem key={course.id}>
-                                <Checkbox
-                                  isChecked={selectedSubjects.includes(course.id)}
-                                  onChange={(e) => {
-                                    if (e.target.checked) {
-                                      setSelectedSubjects([...selectedSubjects, course.id]);
-                                    } else {
-                                      setSelectedSubjects(selectedSubjects.filter(id => id !== course.id));
-                                    }
-                                  }}
+                            <Button
+                              colorScheme="blue"
+                              leftIcon={<FaCalendarAlt />}
+                              onClick={generateDailySchedule}
+                              isLoading={isGeneratingSchedule}
+                              isDisabled={selectedSubjects.length === 0}
+                              width="full"
+                            >
+                              Generate Study Schedule
+                            </Button>
+                          </VStack>
+                        </CardBody>
+                      </Card>
+                    </Box>
+
+                    {/* Right Column - Schedule Display */}
+                    <Box>
+                      {scheduleDisplay.isVisible && scheduleDisplay.schedule ? (
+                        <VStack spacing={4} align="stretch">
+                          <HStack justify="space-between" align="center">
+                            <Heading size="md">Today's Study Schedule</Heading>
+                            <HStack>
+                              <Badge colorScheme="blue" fontSize="sm">
+                                {Math.floor(scheduleDisplay.schedule.totalStudyTime / 60)}h {scheduleDisplay.schedule.totalStudyTime % 60}m
+                              </Badge>
+                            </HStack>
+                          </HStack>
+
+                          {/* Current Session Display */}
+                          {currentSession && (
+                            <Card bg={useColorModeValue('blue.50', 'blue.900')}>
+                              <CardBody>
+                                <VStack spacing={3}>
+                                  <HStack justify="space-between" width="full">
+                                    <VStack align="start" spacing={1}>
+                                      <Text fontWeight="bold">Current Session</Text>
+                                      <Text>{currentSession.currentSubject}</Text>
+                                    </VStack>
+                                    <Text fontSize="2xl" fontWeight="bold" fontFamily="mono">
+                                      {formatTime(elapsedTime)}
+                                    </Text>
+                                  </HStack>
+                                  <ButtonGroup size="lg" isAttached variant="solid">
+                                    {currentSession.status === 'active' ? (
+                                      <IconButton
+                                        aria-label="Pause session"
+                                        icon={<FaPause />}
+                                        colorScheme="yellow"
+                                        onClick={pauseStudySession}
+                                      />
+                                    ) : (
+                                      <IconButton
+                                        aria-label="Resume session"
+                                        icon={<FaPlay />}
+                                        colorScheme="green"
+                                        onClick={resumeStudySession}
+                                      />
+                                    )}
+                                    <IconButton
+                                      aria-label="Stop session"
+                                      icon={<FaStop />}
+                                      colorScheme="red"
+                                      onClick={stopStudySession}
+                                    />
+                                  </ButtonGroup>
+                                </VStack>
+                              </CardBody>
+                            </Card>
+                          )}
+
+                          <Box 
+                            borderLeft="2px solid" 
+                            borderColor="blue.200" 
+                            pl={4}
+                            position="relative"
+                          >
+                            {scheduleDisplay.schedule.subjects.map((subject, index) => (
+                              <Box 
+                                key={subject.subjectId} 
+                                mb={6} 
+                                position="relative"
+                                _before={{
+                                  content: '""',
+                                  position: 'absolute',
+                                  left: '-9px',
+                                  top: '4px',
+                                  width: '4px',
+                                  height: '4px',
+                                  borderRadius: 'full',
+                                  bg: 'blue.500',
+                                  zIndex: 1
+                                }}
+                              >
+                                <HStack 
+                                  spacing={4} 
+                                  p={4} 
+                                  bg={useColorModeValue('white', 'gray.800')}
+                                  borderRadius="md"
+                                  shadow="sm"
+                                  _hover={{ shadow: 'md' }}
+                                  transition="all 0.2s"
                                 >
-                                  {course.name}
-                                </Checkbox>
-                              </ListItem>
+                                  <VStack align="start" spacing={1} flex={1}>
+                                    <HStack>
+                                      <Heading size="sm">{subject.name}</Heading>
+                                      <Badge colorScheme="blue">
+                                        {Math.floor(subject.duration / 60)}h {subject.duration % 60}m
+                                      </Badge>
+                                    </HStack>
+                                    <HStack color="gray.500" fontSize="sm">
+                                      <Icon as={FaClock} />
+                                      <Text>{subject.startTime} - {subject.endTime}</Text>
+                                    </HStack>
+                                  </VStack>
+                                  <HStack>
+                                    {!currentSession && (
+                                      <IconButton
+                                        aria-label="Start study session"
+                                        icon={<FaPlay />}
+                                        colorScheme="green"
+                                        size="sm"
+                                        onClick={() => startStudySession(subject)}
+                                      />
+                                    )}
+                                  </HStack>
+                                </HStack>
+                              </Box>
                             ))}
-                          </List>
-                        </FormControl>
-
-                        <Button
-                          colorScheme="blue"
-                          leftIcon={<FaCalendarAlt />}
-                          onClick={generateDailySchedule}
-                          isLoading={isGeneratingSchedule}
-                          isDisabled={!selectedDate || selectedSubjects.length === 0}
+                          </Box>
+                        </VStack>
+                      ) : (
+                        <Center 
+                          h="full" 
+                          bg={useColorModeValue('gray.50', 'gray.700')} 
+                          borderRadius="md"
+                          p={8}
                         >
-                          Generate Daily Schedule
-                        </Button>
-                      </VStack>
-                    </CardBody>
-                  </Card>
+                          <VStack spacing={4} color="gray.500">
+                            <Icon as={FaCalendarAlt} boxSize={8} />
+                            <Text>Select subjects to generate your study schedule</Text>
+                          </VStack>
+                        </Center>
+                      )}
+                    </Box>
+                  </Grid>
                 </VStack>
               </TabPanel>
             </TabPanels>
@@ -903,58 +1226,8 @@ const StudyPlan = () => {
         </Container>
       </Box>
 
-      {/* Daily Schedule Modal */}
-      <Modal isOpen={isScheduleModalOpen} onClose={onScheduleModalClose} size="xl">
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Daily Study Schedule</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            {dailySchedule && (
-              <VStack spacing={4} align="stretch">
-                <Text fontSize="lg" fontWeight="bold">
-                  Schedule for {new Date(dailySchedule.date).toLocaleDateString()}
-                </Text>
-                <List spacing={3}>
-                  {dailySchedule.subjects.map((subject) => (
-                    <ListItem key={subject.subjectId}>
-                      <Card>
-                        <CardBody>
-                          <HStack justify="space-between">
-                            <VStack align="start" spacing={1}>
-                              <Text fontWeight="bold">{subject.name}</Text>
-                              <Text color="gray.500">
-                                {subject.startTime} - {subject.endTime}
-                              </Text>
-                            </VStack>
-                            <Checkbox
-                              isChecked={subject.completed}
-                              onChange={() => toggleSubjectCompletion(subject.subjectId)}
-                            >
-                              Completed
-                            </Checkbox>
-                          </HStack>
-                        </CardBody>
-                      </Card>
-                    </ListItem>
-                  ))}
-                </List>
-                <Text color="gray.500">
-                  Total Study Time: {Math.floor(dailySchedule.totalStudyTime / 60)}h {dailySchedule.totalStudyTime % 60}m
-                </Text>
-              </VStack>
-            )}
-          </ModalBody>
-          <ModalFooter>
-            <Button colorScheme="blue" mr={3} onClick={onScheduleModalClose}>
-              Close
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
       {/* Add Course Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} isCentered>
+      <Modal isOpen={addCourseModal.isOpen} onClose={addCourseModal.onClose} isCentered>
         <ModalOverlay />
         <ModalContent>
           <ModalHeader>Add New Subject</ModalHeader>
@@ -1244,7 +1517,7 @@ const StudyPlan = () => {
             </Button>
             <Button 
               variant="ghost" 
-              onClick={onClose}
+              onClick={addCourseModal.onClose}
               isDisabled={isLoading}
             >
               Cancel
