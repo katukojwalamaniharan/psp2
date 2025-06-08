@@ -13,51 +13,65 @@ import theme from './theme'
 
 function App() {
   return (
-    <ChakraProvider theme={theme}>
-      <ColorModeScript initialColorMode={theme.config.initialColorMode} />
-      <AuthProvider>
-        <Router>
-          <Routes>
-            <Route path="/" element={<IntroPage />} />
-            <Route path="/login" element={<Login />} />
-            <Route path="/register" element={<Register />} />
-            <Route
-              path="/home"
-              element={
+    <AuthProvider>
+      <Router>
+        <Routes>
+          <Route path="/" element={<IntroPage />} />
+          <Route path="/login" element={
+            <ChakraProvider theme={theme}>
+              <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+              <Login />
+            </ChakraProvider>
+          } />
+          <Route path="/register" element={
+            <ChakraProvider theme={theme}>
+              <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+              <Register />
+            </ChakraProvider>
+          } />
+          <Route
+            path="/home"
+            element={
+              <ChakraProvider theme={theme}>
+                <ColorModeScript initialColorMode={theme.config.initialColorMode} />
                 <PrivateRoute>
                   <Home />
                 </PrivateRoute>
-              }
-            />
-            <Route
-              path="/profile"
-              element={
+              </ChakraProvider>
+            }
+          />
+          <Route
+            path="/profile"
+            element={
+              <ChakraProvider theme={theme}>
+                <ColorModeScript initialColorMode={theme.config.initialColorMode} />
                 <PrivateRoute>
                   <Profile />
                 </PrivateRoute>
-              }
-            />
-            <Route
-              path="/study-plan"
-              element={
+              </ChakraProvider>
+            }
+          />
+          <Route
+            path="/study-plan"
+            element={
+              <ChakraProvider theme={theme}>
+                <ColorModeScript initialColorMode={theme.config.initialColorMode} />
                 <PrivateRoute>
                   <StudyPlan />
                 </PrivateRoute>
-              }
-            />
-            <Route
-              path="/about"
-              element={
-                <PrivateRoute>
-                  <About />
-                </PrivateRoute>
-              }
-            />
-            <Route path="*" element={<Navigate to="/login" replace />} />
-          </Routes>
-        </Router>
-      </AuthProvider>
-    </ChakraProvider>
+              </ChakraProvider>
+            }
+          />
+          <Route path="/about" element={
+            <ChakraProvider theme={theme}>
+              <ColorModeScript initialColorMode={theme.config.initialColorMode} />
+              <About />
+            </ChakraProvider>
+          } />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </Router>
+    </AuthProvider>
   )
 }
 

@@ -24,7 +24,7 @@ const MotionBox = motion(Box)
 export default function Login() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const { signInWithGoogle, currentUser, loading: authLoading } = useAuth()
+  const { signInWithGoogle, currentUser } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
@@ -58,14 +58,6 @@ export default function Login() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (authLoading) {
-    return (
-      <Center h="100vh">
-        <Spinner size="xl" />
-      </Center>
-    )
   }
 
   return (

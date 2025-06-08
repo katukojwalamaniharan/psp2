@@ -57,7 +57,7 @@ import Sidebar from '../components/Sidebar';
 const MotionBox = motion(Box);
 
 const Home = () => {
-  const { currentUser } = useAuth();
+  const { currentUser, signOut } = useAuth();
   const navigate = useNavigate();
   const toast = useToast();
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -114,6 +114,22 @@ const Home = () => {
 
     loadData();
   }, [currentUser, toast]);
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+      navigate('/');
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to log out.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+    }
+  };
 
   if (isLoading) {
     return (
@@ -178,6 +194,11 @@ const Home = () => {
     <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
       <Sidebar />
       <Box ml="280px" p={8}>
+        <Flex justifyContent="flex-end" mb={4}>
+          <Button onClick={handleLogout} colorScheme="red" size="sm">
+            Logout
+          </Button>
+        </Flex>
         <Container maxW="container.xl">
           <VStack spacing={8} align="stretch">
             {/* Welcome Section */}
@@ -252,24 +273,24 @@ const Home = () => {
                   border="1px"
                   borderColor={borderColor}
                 >
-                  <StatLabel>Study Streak</StatLabel>
-                  <StatNumber>3 days</StatNumber>
+                  <StatLabel>Total Study Hours</StatLabel>
+                  <StatNumber>0</StatNumber>
                   <StatHelpText>
                     <StatArrow type="increase" />
-                    23.36%
+                    Aim for consistency
                   </StatHelpText>
                 </Stat>
               </SimpleGrid>
             </MotionBox>
 
-            {/* Quick Actions */}
+            {/* Study Plan Overview */}
             <MotionBox
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
             >
               <Box
-                p={6}
+                p={8}
                 bg={bgColor}
                 shadow="base"
                 rounded="xl"
@@ -277,45 +298,64 @@ const Home = () => {
                 borderColor={borderColor}
               >
                 <VStack spacing={6} align="stretch">
-                  <Heading size="md">Quick Actions</Heading>
-                  <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} spacing={4}>
-                    <Button
-                      leftIcon={<FaBook />}
-                      colorScheme="blue"
-                      variant="outline"
-                      size="lg"
-                      onClick={() => navigate('/study-plan')}
-                    >
-                      View Study Plan
-                    </Button>
-                    <Button
-                      leftIcon={<FaCalendarAlt />}
-                      colorScheme="green"
-                      variant="outline"
-                      size="lg"
-                      onClick={() => navigate('/schedule')}
-                    >
-                      Check Schedule
-                    </Button>
-                    <Button
-                      leftIcon={<FaChartLine />}
-                      colorScheme="purple"
-                      variant="outline"
-                      size="lg"
-                      onClick={() => navigate('/progress')}
-                    >
-                      Track Progress
-                    </Button>
-                    <Button
-                      leftIcon={<FaUser />}
-                      colorScheme="orange"
-                      variant="outline"
-                      size="lg"
-                      onClick={() => navigate('/profile')}
-                    >
-                      Update Profile
-                    </Button>
-                  </SimpleGrid>
+                  <Heading size="lg">Your Study Plan at a Glance</Heading>
+                  <Text color="gray.500">No active study plans found. Start by creating one!</Text>
+                  <Button colorScheme="purple" leftIcon={<Icon as={FaBook} />} onClick={() => navigate('/study-plan')}>
+                    Manage Study Plan
+                  </Button>
+                </VStack>
+              </Box>
+            </MotionBox>
+
+            {/* Daily Schedule Preview */}
+            <MotionBox
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.3 }}
+            >
+              <Box
+                p={8}
+                bg={bgColor}
+                shadow="base"
+                rounded="xl"
+                border="1px"
+                borderColor={borderColor}
+              >
+                <VStack spacing={6} align="stretch">
+                  <Heading size="lg">Today's Schedule</Heading>
+                  <Text color="gray.500">No schedule generated for today. Plan your day!</Text>
+                  <Button colorScheme="green" leftIcon={<Icon as={FaCalendarAlt} />}>
+                    Generate Daily Schedule
+                  </Button>
+                </VStack>
+              </Box>
+            </MotionBox>
+
+            {/* Achievements/Badges */}
+            <MotionBox
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+            >
+              <Box
+                p={8}
+                bg={bgColor}
+                shadow="base"
+                rounded="xl"
+                border="1px"
+                borderColor={borderColor}
+              >
+                <VStack spacing={6} align="stretch">
+                  <Heading size="lg">Your Achievements</Heading>
+                  <Text color="gray.500">Keep studying to unlock exciting badges!</Text>
+                  <Wrap spacing={4}>
+                    <WrapItem>
+                      <Tag size="lg" colorScheme="gray" borderRadius="full">
+                        <TagLeftIcon boxSize="12px" as={FaTrophy} />
+                        <TagLabel>No Badges Yet</TagLabel>
+                      </Tag>
+                    </WrapItem>
+                  </Wrap>
                 </VStack>
               </Box>
             </MotionBox>

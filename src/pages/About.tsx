@@ -1,186 +1,262 @@
 import React from 'react';
-import { Box, Text, Heading, VStack, Container, useColorModeValue, Icon, Divider, ListItem, List } from '@chakra-ui/react';
-import Sidebar from '../components/Sidebar';
-import { FaBook, FaBrain, FaChartLine, FaLaptopCode, FaComments, FaTimesCircle, FaCheckCircle } from 'react-icons/fa';
-import { motion, useInView } from 'framer-motion';
-
-const MotionVStack = motion(VStack);
-const MotionHeading = motion(Heading);
-const MotionText = motion(Text);
-const MotionList = motion(List);
-const MotionListItem = motion(ListItem);
+import { ArrowRight, BookOpen, Target, TrendingUp, Users, Calendar, Moon, Smartphone, Brain, Github, Linkedin, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent } from '@/components/ui/card';
 
 const About = () => {
-  const ref1 = React.useRef(null);
-  const isInView1 = useInView(ref1, { once: true, amount: 0.5 });
+  const problems = [
+    {
+      before: "Unstructured study",
+      after: "Organized subject plans",
+      icon: <BookOpen className="h-6 w-6 text-blue-600" />
+    },
+    {
+      before: "No tracking",
+      after: "Progress bars and streaks",
+      icon: <TrendingUp className="h-6 w-6 text-green-600" />
+    },
+    {
+      before: "No daily focus",
+      after: "Daily planner view",
+      icon: <Target className="h-6 w-6 text-purple-600" />
+    },
+    {
+      before: "No motivation",
+      after: "Visual feedback and habit building",
+      icon: <Users className="h-6 w-6 text-orange-600" />
+    }
+  ];
 
-  const ref2 = React.useRef(null);
-  const isInView2 = useInView(ref2, { once: true, amount: 0.5 });
+  const teamMembers = [
+    {
+      name: "Alex Chen",
+      role: "Frontend Developer",
+      initials: "AC",
+      bio: "Passionate about creating intuitive user interfaces and smooth user experiences."
+    },
+    {
+      name: "Sarah Kumar",
+      role: "Backend Developer", 
+      initials: "SK",
+      bio: "Specializes in scalable architecture and database optimization for student apps."
+    },
+    {
+      name: "Jordan Smith",
+      role: "UX Designer",
+      initials: "JS",
+      bio: "Focuses on user-centered design to make studying more engaging and productive."
+    },
+    {
+      name: "Maya Patel",
+      role: "Full-Stack Developer",
+      initials: "MP",
+      bio: "Bridges frontend and backend to create seamless learning experiences."
+    }
+  ];
 
-  const ref3 = React.useRef(null);
-  const isInView3 = useInView(ref3, { once: true, amount: 0.5 });
+  const techStack = [
+    { name: "React", color: "bg-blue-100 text-blue-800" },
+    { name: "TypeScript", color: "bg-blue-100 text-blue-800" },
+    { name: "Firebase", color: "bg-yellow-100 text-yellow-800" },
+    { name: "TailwindCSS", color: "bg-cyan-100 text-cyan-800" },
+    { name: "Recharts", color: "bg-green-100 text-green-800" },
+    { name: "React Query", color: "bg-red-100 text-red-800" },
+    { name: "Vite", color: "bg-purple-100 text-purple-800" }
+  ];
 
-  const ref4 = React.useRef(null);
-  const isInView4 = useInView(ref4, { once: true, amount: 0.5 });
-
-  const ref5 = React.useRef(null);
-  const isInView5 = useInView(ref5, { once: true, amount: 0.5 });
-
-  const fadeInVariants = {
-    hidden: { opacity: 0, y: 50 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.8, ease: "easeOut" } },
-  };
+  const roadmapItems = [
+    { feature: "Calendar sync", icon: <Calendar className="h-5 w-5" /> },
+    { feature: "Dark mode", icon: <Moon className="h-5 w-5" /> },
+    { feature: "Mobile version", icon: <Smartphone className="h-5 w-5" /> },
+    { feature: "AI-powered suggestions", icon: <Brain className="h-5 w-5" /> }
+  ];
 
   return (
-    <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
-      <Sidebar />
-      <Box ml="280px" p={8}>
-        <Container maxW="container.xl">
-          <VStack spacing={10} align="stretch">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
+      {/* Hero Section */}
+      <section className="relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5"></div>
+        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
+          <div className="text-center animate-fade-in">
+            <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl mb-8 animate-scale-in">
+              <BookOpen className="h-10 w-10 text-white" />
+            </div>
+            <h1 className="text-5xl md:text-7xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-6">
+              StudyPlanner
+            </h1>
+            <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto mb-8">
+              Empowering students through structured learning and habit tracking
+            </p>
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button size="lg" className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700">
+                Get Started <ArrowRight className="ml-2 h-5 w-5" />
+              </Button>
+              <Button variant="outline" size="lg">
+                Learn More
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
 
-            {/* Header Section */}
-            <MotionVStack
-              ref={ref1}
-              initial="hidden"
-              animate={isInView1 ? "visible" : "hidden"}
-              variants={fadeInVariants}
-              align="start" spacing={4}
-            >
-              <MotionHeading size="xl" color={useColorModeValue('blue.600', 'blue.300')}>
-                📚 About the Project – StudyPlanner
-              </MotionHeading>
-              <MotionText fontSize="lg" color={useColorModeValue('gray.700', 'gray.300')}>
-                🌟 Our Vision
-              </MotionText>
-              <MotionText fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>
-                At StudyPlanner, our mission is to empower students to take control of their learning through structured planning, consistency, and intelligent tracking. We believe that time management and discipline are just as important as the content we study — and the right tools can make all the difference.
-              </MotionText>
-            </MotionVStack>
+      {/* Our Vision */}
+      <section className="py-20 md:py-32">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-8">Our Vision</h2>
+          <p className="text-lg md:text-xl text-muted-foreground leading-relaxed">
+            We believe every student deserves the tools to succeed. StudyPlanner was born from our own struggles with 
+            disorganization, lack of motivation, and the absence of proper tracking systems. We're here to transform 
+            chaotic study routines into structured, motivating, and measurable learning experiences.
+          </p>
+        </div>
+      </section>
 
-            <Divider borderColor={useColorModeValue('gray.300', 'gray.600')} />
+      {/* What StudyPlanner Solves */}
+      <section className="py-20 bg-white/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">What StudyPlanner Solves</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {problems.map((problem, index) => (
+              <Card key={index} className="group hover:shadow-lg transition-all duration-300 hover:-translate-y-1">
+                <CardContent className="p-8">
+                  <div className="flex items-center mb-6">
+                    {problem.icon}
+                    <div className="ml-4 flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground line-through">{problem.before}</span>
+                        <ArrowRight className="h-4 w-4 text-muted-foreground mx-2" />
+                        <span className="font-semibold text-primary">{problem.after}</span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Why We Built This Section */}
-            <MotionVStack
-              ref={ref2}
-              initial="hidden"
-              animate={isInView2 ? "visible" : "hidden"}
-              variants={fadeInVariants}
-              align="start" spacing={4}
-            >
-              <MotionHeading size="lg" color={useColorModeValue('gray.700', 'gray.200')}>
-                🧠 Why We Built This
-              </MotionHeading>
-              <MotionText fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>
-                In today's fast-paced academic environment, many students:
-              </MotionText>
-              <MotionList spacing={2} pl={4}>
-                <MotionListItem display="flex" alignItems="center">
-                  <Icon as={FaTimesCircle} color="red.400" mr={2} />
-                  <Text color={useColorModeValue('gray.600', 'gray.400')}>Struggled to organize their subjects effectively</Text>
-                </MotionListItem>
-                <MotionListItem display="flex" alignItems="center">
-                  <Icon as={FaTimesCircle} color="red.400" mr={2} />
-                  <Text color={useColorModeValue('gray.600', 'gray.400')}>Lost consistency due to a lack of visual progress tracking</Text>
-                </MotionListItem>
-                <MotionListItem display="flex" alignItems="center">
-                  <Icon as={FaTimesCircle} color="red.400" mr={2} />
-                  <Text color={useColorModeValue('gray.600', 'gray.400')}>Relied on static to-do lists with no sense of streak or motivation</Text>
-                </MotionListItem>
-                <MotionListItem display="flex" alignItems="center">
-                  <Icon as={FaTimesCircle} color="red.400" mr={2} />
-                  <Text color={useColorModeValue('gray.600', 'gray.400')}>Wasted time manually planning instead of focusing on actual study</Text>
-                </MotionListItem>
-              </MotionList>
-              <MotionText fontSize="md" color={useColorModeValue('gray.600', 'gray.400')} pt={2}>
-                We've experienced these frustrations ourselves — which led us to build StudyPlanner as a real-time solution to real student problems.
-              </MotionText>
-            </MotionVStack>
+      {/* About the Project */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-12">About the Project</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <Card className="text-center hover:shadow-lg transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <BookOpen className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">Final Year Project</h3>
+                <p className="text-muted-foreground">A comprehensive full-stack application built as our Computer Science Engineering capstone project.</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center hover:shadow-lg transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-gradient-to-r from-green-600 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Users className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">By Students</h3>
+                <p className="text-muted-foreground">Created by passionate CSE students who understand the real challenges of academic life.</p>
+              </CardContent>
+            </Card>
+            <Card className="text-center hover:shadow-lg transition-shadow">
+              <CardContent className="p-8">
+                <div className="w-16 h-16 bg-gradient-to-r from-purple-600 to-pink-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Target className="h-8 w-8 text-white" />
+                </div>
+                <h3 className="text-xl font-semibold mb-2">For Students</h3>
+                <p className="text-muted-foreground">Designed to help students stay productive, consistent, and motivated in their learning journey.</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
 
-            <Divider borderColor={useColorModeValue('gray.300', 'gray.600')} />
+      {/* Meet the Team */}
+      <section className="py-20 bg-white/50">
+        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Meet the Team</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+            {teamMembers.map((member, index) => (
+              <Card key={index} className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
+                <CardContent className="p-6 text-center">
+                  <div className="w-24 h-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white text-3xl font-bold mx-auto mb-4">
+                    {member.initials}
+                  </div>
+                  <h3 className="text-xl font-semibold mb-2">{member.name}</h3>
+                  <p className="text-sm text-blue-600 font-medium mb-3">{member.role}</p>
+                  <p className="text-muted-foreground text-sm">{member.bio}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* What StudyPlanner Solves Section */}
-            <MotionVStack
-              ref={ref3}
-              initial="hidden"
-              animate={isInView3 ? "visible" : "hidden"}
-              variants={fadeInVariants}
-              align="start" spacing={4}
-            >
-              <MotionHeading size="lg" color={useColorModeValue('gray.700', 'gray.200')}>
-                🔍 What StudyPlanner Solves
-              </MotionHeading>
-              <MotionList spacing={3}>
-                <MotionListItem display="flex" alignItems="flex-start">
-                  <Icon as={FaCheckCircle} color="green.400" mr={3} mt={1} />
-                  <VStack align="start" spacing={0}>
-                    <Text fontWeight="bold" color={useColorModeValue('gray.800', 'white')}>🗂️ Disorganized Study Plans</Text>
-                    <Text fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>→ Create structured plans by subject, difficulty, and category</Text>
-                  </VStack>
-                </MotionListItem>
-                <MotionListItem display="flex" alignItems="flex-start">
-                  <Icon as={FaCheckCircle} color="green.400" mr={3} mt={1} />
-                  <VStack align="start" spacing={0}>
-                    <Text fontWeight="bold" color={useColorModeValue('gray.800', 'white')}>🧩 Lack of Daily Focus</Text>
-                    <Text fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>→ View and complete daily tasks using the integrated Daily Planner</Text>
-                  </VStack>
-                </MotionListItem>
-                <MotionListItem display="flex" alignItems="flex-start">
-                  <Icon as={FaCheckCircle} color="green.400" mr={3} mt={1} />
-                  <VStack align="start" spacing={0}>
-                    <Text fontWeight="bold" color={useColorModeValue('gray.800', 'white')}>📊 No Progress Feedback</Text>
-                    <Text fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>→ Visual progress bars, estimated hours, and personalized streaks</Text>
-                  </VStack>
-                </MotionListItem>
-                <MotionListItem display="flex" alignItems="flex-start">
-                  <Icon as={FaCheckCircle} color="green.400" mr={3} mt={1} />
-                  <VStack align="start" spacing={0}>
-                    <Text fontWeight="bold" color={useColorModeValue('gray.800', 'white')}>🧠 No Retention of Habits</Text>
-                    <Text fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>→ Motivation through streak tracking and performance analytics</Text>
-                  </VStack>
-                </MotionListItem>
-              </MotionList>
-            </MotionVStack>
+      {/* Tech Stack */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Powered By Modern Technologies</h2>
+          <div className="flex flex-wrap justify-center gap-4">
+            {techStack.map((tech, index) => (
+              <span key={index} className={`px-4 py-2 rounded-full text-sm font-medium ${tech.color}`}>
+                {tech.name}
+              </span>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            <Divider borderColor={useColorModeValue('gray.300', 'gray.600')} />
+      {/* Future Roadmap */}
+      <section className="py-20 bg-white/50">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Our Roadmap</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            {roadmapItems.map((item, index) => (
+              <Card key={index} className="hover:shadow-lg transition-shadow">
+                <CardContent className="p-6 flex items-center">
+                  <div className="p-3 rounded-full bg-blue-100 text-blue-600 mr-4">
+                    {item.icon}
+                  </div>
+                  <p className="text-lg font-medium">{item.feature}</p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
 
-            {/* Built With Students in Mind Section */}
-            <MotionVStack
-              ref={ref4}
-              initial="hidden"
-              animate={isInView4 ? "visible" : "hidden"}
-              variants={fadeInVariants}
-              align="start" spacing={4}
-            >
-              <MotionHeading size="lg" color={useColorModeValue('gray.700', 'gray.200')}>
-                🛠️ Built With Students in Mind
-              </MotionHeading>
-              <MotionText fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>
-                StudyPlanner is not just a project — it's a companion for learners who want to stay productive without being overwhelmed. Whether you're preparing for competitive exams or managing a semester's workload, our tool gives you clarity, consistency, and confidence.
-              </MotionText>
-            </MotionVStack>
+      {/* Contact Section */}
+      <section className="py-20">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <h2 className="text-3xl md:text-4xl font-bold mb-8">Get in Touch</h2>
+          <p className="text-lg text-muted-foreground mb-8">
+            Have questions, feedback, or just want to say hello? We'd love to hear from you!
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <Button size="lg" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
+              <Mail className="mr-2 h-5 w-5" /> Email Us
+            </Button>
+            <Button size="lg" variant="outline" className="border-gray-800 text-gray-800 hover:bg-gray-100">
+              <Github className="mr-2 h-5 w-5" /> GitHub
+            </Button>
+            <Button size="lg" variant="outline" className="border-blue-700 text-blue-700 hover:bg-blue-50">
+              <Linkedin className="mr-2 h-5 w-5" /> LinkedIn
+            </Button>
+          </div>
+        </div>
+      </section>
 
-            <Divider borderColor={useColorModeValue('gray.300', 'gray.600')} />
-
-            {/* Collaboration Section */}
-            <MotionVStack
-              ref={ref5}
-              initial="hidden"
-              animate={isInView5 ? "visible" : "hidden"}
-              variants={fadeInVariants}
-              align="start" spacing={4}
-            >
-              <MotionHeading size="lg" color={useColorModeValue('gray.700', 'gray.200')}>
-                💬 Want to Collaborate or Learn More?
-              </MotionHeading>
-              <MotionText fontSize="md" color={useColorModeValue('gray.600', 'gray.400')}>
-                We're always open to feedback, collaboration, or mentorship. Let's build a smarter learning experience together.
-              </MotionText>
-            </MotionVStack>
-
-          </VStack>
-        </Container>
-      </Box>
-    </Box>
+      {/* Footer */}
+      <footer className="bg-gray-800 text-white py-10">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+          <p>&copy; {new Date().getFullYear()} StudyPlanner. All rights reserved.</p>
+          <p className="text-sm text-gray-400 mt-2">
+            Designed and built with passion by students, for students.
+          </p>
+        </div>
+      </footer>
+    </div>
   );
 };
 
