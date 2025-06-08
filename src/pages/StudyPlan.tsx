@@ -39,6 +39,7 @@ import {
   MenuButton,
   MenuList,
   MenuItem,
+  MenuDivider,
   Flex,
   Divider,
   Tabs,
@@ -59,9 +60,10 @@ import {
   Center,
   ButtonGroup,
   IconButton,
-  useColorMode
+  useColorMode,
+  Spinner
 } from '@chakra-ui/react';
-import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause } from 'react-icons/fa';
+import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause, FaBook } from 'react-icons/fa';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -222,6 +224,7 @@ const StudyPlan = () => {
   const [currentSession, setCurrentSession] = useState<StudySession | null>(null);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  const [savedSchedules, setSavedSchedules] = useState<DailySchedule[]>([]);
 
   // All useRef hooks
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -232,7 +235,7 @@ const StudyPlan = () => {
 
   // All useContext hooks
   const toast = useToast();
-  const { currentUser } = useAuth();
+  const { currentUser, loading: authLoading } = useAuth();
   const { colorMode } = useColorMode();
 
   // Constants
@@ -319,10 +322,25 @@ const StudyPlan = () => {
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
         console.log('Received courses update');
-        const coursesData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
-        })) as Course[];
+        const coursesData = snapshot.docs.map(doc => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            ...data,
+            dailyStudyTime: data.dailyStudyTime || { hours: 0, minutes: 30 },
+            streak: data.streak || 0,
+            progress: data.progress || 0,
+            topics: data.topics || [],
+            resources: data.resources || [],
+            studyDays: data.studyDays || [],
+            pomodoroSettings: data.pomodoroSettings || {
+              workDuration: 25,
+              breakDuration: 5,
+              longBreakDuration: 15,
+              sessionsUntilLongBreak: 4
+            }
+          };
+        }) as Course[];
         console.log('Courses data:', coursesData);
         setCourses(coursesData);
         setError(null);
@@ -338,6 +356,38 @@ const StudyPlan = () => {
       unsubscribe();
     };
   }, [currentUser]);
+
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const today = new Date().toISOString().split('T')[0];
+    setSelectedDate(today);
+
+    const q = query(
+      collection(db, 'user_study_plans', currentUser.uid, 'schedules'),
+      where('date', '==', today),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const schedules = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as DailySchedule[];
+
+      setSavedSchedules(schedules);
+      
+      if (schedules.length > 0) {
+        setScheduleDisplay({
+          isVisible: true,
+          date: schedules[0].date,
+          schedule: schedules[0]
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [currentUser, selectedDate]);
 
   // Timer effect
   useEffect(() => {
@@ -670,6 +720,18 @@ const StudyPlan = () => {
 
     setIsGeneratingSchedule(true);
     try {
+      // Check if a schedule already exists for today
+      const existingSchedule = savedSchedules.find(s => s.date === selectedDate);
+      if (existingSchedule) {
+        // Update existing schedule
+        const scheduleRef = doc(db, 'user_study_plans', currentUser.uid, 'schedules', existingSchedule.id);
+        await updateDoc(scheduleRef, {
+          subjects: [],
+          totalStudyTime: 0,
+          updatedAt: serverTimestamp()
+        });
+      }
+
       console.log('Starting schedule generation...');
       console.log('Selected subjects:', selectedSubjects);
 
@@ -937,6 +999,67 @@ const StudyPlan = () => {
     }
   };
 
+  // Modify the date selection handler
+  const handleDateChange = (date: string) => {
+    setSelectedDate(date);
+    const scheduleForDate = savedSchedules.find(s => s.date === date);
+    if (scheduleForDate) {
+      setScheduleDisplay({
+        isVisible: true,
+        date: scheduleForDate.date,
+        schedule: scheduleForDate
+      });
+    } else {
+      setScheduleDisplay({
+        isVisible: false,
+        date: date,
+        schedule: null
+      });
+    }
+  };
+
+  // Add loading state
+  if (authLoading) {
+    return (
+      <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
+        <Sidebar />
+        <Box ml="280px" p={8}>
+          <Container maxW="container.xl">
+            <Center h="50vh">
+              <VStack spacing={4}>
+                <Spinner size="xl" color="blue.500" />
+                <Text>Loading your study plan...</Text>
+              </VStack>
+            </Center>
+          </Container>
+        </Box>
+      </Box>
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
+        <Sidebar />
+        <Box ml="280px" p={8}>
+          <Container maxW="container.xl">
+            <Center h="50vh">
+              <VStack spacing={4}>
+                <Alert status="warning" borderRadius="md">
+                  <AlertIcon />
+                  <AlertTitle>Authentication Required</AlertTitle>
+                  <AlertDescription>
+                    Please sign in to access your study plan.
+                  </AlertDescription>
+                </Alert>
+              </VStack>
+            </Center>
+          </Container>
+        </Box>
+      </Box>
+    );
+  }
+
   return (
     <Box minH="100vh" bg={useColorModeValue('gray.50', 'gray.900')}>
       <Sidebar />
@@ -950,136 +1073,374 @@ const StudyPlan = () => {
 
             <TabPanels>
               <TabPanel>
-                <Heading size="lg" mb={6}>
-                  Study Plan
-                </Heading>
-
-                {error && (
-                  <Alert status="error" mb={4}>
-                    <AlertIcon />
-                    <AlertTitle>Error!</AlertTitle>
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <Button 
-                  leftIcon={<FaPlus />} 
-                  colorScheme="blue" 
-                  onClick={addCourseModal.onOpen}
-                  isLoading={isLoading}
-                >
-                  Add Subject
-                </Button>
-
-                {/* Display Courses */}
-                <VStack spacing={4} mt={8} align="stretch">
-                  {courses.map((course) => (
-                    <Box
-                      key={course.id}
-                      p={6}
-                      bg={useColorModeValue('white', 'gray.800')}
-                      borderRadius="lg"
-                      shadow="base"
-                      borderLeft="4px solid"
-                      borderLeftColor={getPriorityColor(course.priority)}
+                <VStack spacing={6} align="stretch">
+                  <HStack justify="space-between" align="center">
+                    <Heading size="lg">All Subjects</Heading>
+                    <Button 
+                      leftIcon={<FaPlus />} 
+                      colorScheme="blue" 
+                      onClick={addCourseModal.onOpen}
+                      isLoading={isLoading}
                     >
-                      <VStack align="stretch" spacing={4}>
-                        <HStack justify="space-between">
-                          <HStack>
-                            <Text fontSize="xl" fontWeight="bold">{course.name}</Text>
-                            <Badge colorScheme={getPriorityColor(course.priority)}>
-                              <Icon as={FaFlag} mr={1} />
-                              {course.priority}
-                            </Badge>
-                          </HStack>
-                          <Badge colorScheme={course.progress === 100 ? 'green' : 'blue'}>
-                            {course.progress}%
-                          </Badge>
-                        </HStack>
-                        <Text color="gray.500">
-                          Time: {course.duration.hours}h {course.duration.minutes}m
-                        </Text>
-                        <Progress value={course.progress} colorScheme="blue" size="lg" borderRadius="full" />
-                        <HStack justify="space-between">
-                          <HStack>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleUpdateProgress(course.id, Math.max(0, course.progress - 10))}
-                              isDisabled={course.progress <= 0}
-                            >
-                              -10%
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              onClick={() => handleUpdateProgress(course.id, Math.min(100, course.progress + 10))}
-                              isDisabled={course.progress >= 100}
-                            >
-                              +10%
-                            </Button>
-                            <Select
-                              size="sm"
-                              value={course.priority}
-                              onChange={(e) => handleUpdatePriority(course.id, e.target.value as 'high' | 'medium' | 'low')}
-                              width="100px"
-                            >
-                              <option value="high">High</option>
-                              <option value="medium">Medium</option>
-                              <option value="low">Low</option>
-                            </Select>
-                          </HStack>
-                          <Button 
-                            size="sm" 
-                            colorScheme="red" 
-                            variant="ghost"
-                            onClick={() => handleDeleteCourse(course.id)}
-                          >
-                            Delete
-                          </Button>
-                        </HStack>
-                      </VStack>
-                    </Box>
-                  ))}
+                      Add Subject
+                    </Button>
+                  </HStack>
+
+                  {/* Search and Filter Bar */}
+                  <Card>
+                    <CardBody>
+                      <HStack spacing={4}>
+                        <InputGroup>
+                          <InputLeftElement>
+                            <Icon as={FaSearch} color="gray.400" />
+                          </InputLeftElement>
+                          <Input
+                            placeholder="Search subjects..."
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                          />
+                        </InputGroup>
+                        <Select
+                          value={sortBy}
+                          onChange={(e) => setSortBy(e.target.value as 'priority' | 'progress' | 'name')}
+                          width="200px"
+                        >
+                          <option value="priority">Sort by Priority</option>
+                          <option value="progress">Sort by Progress</option>
+                          <option value="name">Sort by Name</option>
+                        </Select>
+                        <Menu>
+                          <MenuButton as={Button} rightIcon={<FaFilter />}>
+                            Filter
+                          </MenuButton>
+                          <MenuList>
+                            <MenuItem onClick={() => setFilterPriority('all')}>All Priorities</MenuItem>
+                            <MenuItem onClick={() => setFilterPriority('high')}>High Priority</MenuItem>
+                            <MenuItem onClick={() => setFilterPriority('medium')}>Medium Priority</MenuItem>
+                            <MenuItem onClick={() => setFilterPriority('low')}>Low Priority</MenuItem>
+                            <MenuDivider />
+                            <MenuItem onClick={() => setFilterDifficulty('all')}>All Difficulties</MenuItem>
+                            <MenuItem onClick={() => setFilterDifficulty('beginner')}>Beginner</MenuItem>
+                            <MenuItem onClick={() => setFilterDifficulty('intermediate')}>Intermediate</MenuItem>
+                            <MenuItem onClick={() => setFilterDifficulty('advanced')}>Advanced</MenuItem>
+                          </MenuList>
+                        </Menu>
+                      </HStack>
+                    </CardBody>
+                  </Card>
+
+                  {/* Subjects Grid */}
+                  <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={6}>
+                    {courses
+                      .filter(course => 
+                        course.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
+                        (filterPriority === 'all' || course.priority === filterPriority) &&
+                        (filterDifficulty === 'all' || course.difficulty === filterDifficulty)
+                      )
+                      .sort((a, b) => {
+                        if (sortBy === 'priority') {
+                          const priorityOrder = { high: 3, medium: 2, low: 1 };
+                          return priorityOrder[b.priority] - priorityOrder[a.priority];
+                        }
+                        if (sortBy === 'progress') {
+                          return b.progress - a.progress;
+                        }
+                        return a.name.localeCompare(b.name);
+                      })
+                      .map((course) => (
+                        <Card 
+                          key={course.id}
+                          borderLeft="4px solid"
+                          borderLeftColor={getPriorityColor(course.priority)}
+                          _hover={{ transform: 'translateY(-2px)', shadow: 'lg' }}
+                          transition="all 0.2s"
+                        >
+                          <CardBody>
+                            <VStack align="stretch" spacing={4}>
+                              <HStack justify="space-between">
+                                <VStack align="start" spacing={1}>
+                                  <Heading size="md">{course.name}</Heading>
+                                  <HStack>
+                                    <Badge colorScheme={getPriorityColor(course.priority)}>
+                                      {course.priority}
+                                    </Badge>
+                                    <Badge colorScheme={course.difficulty === 'advanced' ? 'red' : course.difficulty === 'intermediate' ? 'orange' : 'green'}>
+                                      {course.difficulty}
+                                    </Badge>
+                                  </HStack>
+                                </VStack>
+                                <Menu>
+                                  <MenuButton
+                                    as={IconButton}
+                                    icon={<FaSort />}
+                                    variant="ghost"
+                                    size="sm"
+                                  />
+                                  <MenuList>
+                                    <MenuItem onClick={() => handleUpdatePriority(course.id, 'high')}>
+                                      Set High Priority
+                                    </MenuItem>
+                                    <MenuItem onClick={() => handleUpdatePriority(course.id, 'medium')}>
+                                      Set Medium Priority
+                                    </MenuItem>
+                                    <MenuItem onClick={() => handleUpdatePriority(course.id, 'low')}>
+                                      Set Low Priority
+                                    </MenuItem>
+                                    <MenuDivider />
+                                    <MenuItem 
+                                      color="red.500"
+                                      onClick={() => handleDeleteCourse(course.id)}
+                                    >
+                                      Delete Subject
+                                    </MenuItem>
+                                  </MenuList>
+                                </Menu>
+                              </HStack>
+
+                              <Box>
+                                <HStack justify="space-between" mb={2}>
+                                  <Text color="gray.500">Progress</Text>
+                                  <Text fontWeight="bold">{course.progress}%</Text>
+                                </HStack>
+                                <Progress 
+                                  value={course.progress} 
+                                  colorScheme="blue" 
+                                  size="lg" 
+                                  borderRadius="full"
+                                />
+                              </Box>
+
+                              <HStack justify="space-between">
+                                <VStack align="start" spacing={1}>
+                                  <Text color="gray.500" fontSize="sm">Study Time</Text>
+                                  <Text fontWeight="medium">
+                                    {course.dailyStudyTime?.hours || 0}h {course.dailyStudyTime?.minutes || 0}m
+                                  </Text>
+                                </VStack>
+                                <VStack align="end" spacing={1}>
+                                  <Text color="gray.500" fontSize="sm">Streak</Text>
+                                  <Text fontWeight="medium">{course.streak || 0} days</Text>
+                                </VStack>
+                              </HStack>
+
+                              <ButtonGroup size="sm" isAttached width="full">
+                                <Button
+                                  flex={1}
+                                  onClick={() => handleUpdateProgress(course.id, Math.max(0, course.progress - 10))}
+                                  isDisabled={course.progress <= 0}
+                                >
+                                  -10%
+                                </Button>
+                                <Button
+                                  flex={1}
+                                  onClick={() => handleUpdateProgress(course.id, Math.min(100, course.progress + 10))}
+                                  isDisabled={course.progress >= 100}
+                                >
+                                  +10%
+                                </Button>
+                              </ButtonGroup>
+                            </VStack>
+                          </CardBody>
+                        </Card>
+                    ))}
+                  </Grid>
                 </VStack>
               </TabPanel>
 
               <TabPanel>
-                <VStack spacing={6} align="stretch">
-                  <Heading size="lg">Daily Study Planner</Heading>
-                  
-                  <Grid templateColumns="repeat(2, 1fr)" gap={6}>
-                    {/* Left Column - Subject Selection */}
-                    <Box>
-                      <Card>
-                        <CardBody>
-                          <VStack spacing={4}>
-                            <FormControl>
-                              <FormLabel>Select Subjects</FormLabel>
-                              <List spacing={2}>
-                                {courses.map(course => (
-                                  <ListItem key={course.id}>
-                                    <Checkbox
-                                      isChecked={selectedSubjects.includes(course.id)}
-                                      onChange={(e) => {
-                                        if (e.target.checked) {
-                                          setSelectedSubjects([...selectedSubjects, course.id]);
-                                        } else {
-                                          setSelectedSubjects(selectedSubjects.filter(id => id !== course.id));
-                                        }
-                                      }}
-                                    >
-                                      {course.name}
-                                    </Checkbox>
-                                  </ListItem>
-                                ))}
-                              </List>
-                            </FormControl>
+                <VStack spacing={8} align="stretch">
+                  {/* Header Section */}
+                  <HStack justify="space-between" align="center" bg={useColorModeValue('white', 'gray.800')} p={4} borderRadius="lg" shadow="sm">
+                    <Heading size="lg">Daily Study Planner</Heading>
+                    <HStack spacing={4}>
+                      <Button
+                        leftIcon={<FaCalendarAlt />}
+                        onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                        variant="outline"
+                        size="md"
+                      >
+                        Today
+                      </Button>
+                      <Input
+                        type="date"
+                        value={selectedDate}
+                        onChange={(e) => handleDateChange(e.target.value)}
+                        width="200px"
+                        size="md"
+                      />
+                    </HStack>
+                  </HStack>
 
-                            <Button
+                  {/* Enhanced Stats Section */}
+                  <Grid templateColumns="repeat(4, 1fr)" gap={6}>
+                    {/* Total Study Time Card */}
+                    <Card shadow="md" borderRadius="lg">
+                      <CardBody>
+                        <VStack align="start" spacing={3}>
+                          <HStack>
+                            <Icon as={FaClock} color="blue.500" boxSize={5} />
+                            <Text color="gray.500" fontSize="sm">Total Study Time</Text>
+                          </HStack>
+                          <Text fontSize="2xl" fontWeight="bold">
+                            {scheduleDisplay.schedule ? 
+                              `${Math.floor(scheduleDisplay.schedule.totalStudyTime / 60)}h ${scheduleDisplay.schedule.totalStudyTime % 60}m` 
+                              : '0h 0m'}
+                          </Text>
+                          <Progress 
+                            value={scheduleDisplay.schedule ? (scheduleDisplay.schedule.totalStudyTime / (8 * 60)) * 100 : 0} 
+                            colorScheme="blue" 
+                            size="sm" 
+                            width="full"
+                            borderRadius="full"
+                          />
+                          <Text fontSize="xs" color="gray.500">
+                            {scheduleDisplay.schedule ? 
+                              `${Math.round((scheduleDisplay.schedule.totalStudyTime / (8 * 60)) * 100)}% of daily goal` 
+                              : '0% of daily goal'}
+                          </Text>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+
+                    {/* Subjects Planned Card */}
+                    <Card shadow="md" borderRadius="lg">
+                      <CardBody>
+                        <VStack align="start" spacing={3}>
+                          <HStack>
+                            <Icon as={FaBook} color="green.500" boxSize={5} />
+                            <Text color="gray.500" fontSize="sm">Subjects Planned</Text>
+                          </HStack>
+                          <Text fontSize="2xl" fontWeight="bold">
+                            {scheduleDisplay.schedule ? scheduleDisplay.schedule.subjects.length : 0}
+                          </Text>
+                          <Progress 
+                            value={scheduleDisplay.schedule ? (scheduleDisplay.schedule.subjects.length / courses.length) * 100 : 0} 
+                            colorScheme="green" 
+                            size="sm" 
+                            width="full"
+                            borderRadius="full"
+                          />
+                          <Text fontSize="xs" color="gray.500">
+                            of {courses.length} total subjects
+                          </Text>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+
+                    {/* Priority Distribution Card */}
+                    <Card shadow="md" borderRadius="lg">
+                      <CardBody>
+                        <VStack align="start" spacing={3}>
+                          <HStack>
+                            <Icon as={FaFlag} color="orange.500" boxSize={5} />
+                            <Text color="gray.500" fontSize="sm">Priority Distribution</Text>
+                          </HStack>
+                          <HStack spacing={4} width="full">
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" color="red.500">High</Text>
+                              <Text fontSize="lg" fontWeight="bold">
+                                {scheduleDisplay.schedule ? 
+                                  scheduleDisplay.schedule.subjects.filter(s => 
+                                    courses.find(c => c.id === s.subjectId)?.priority === 'high'
+                                  ).length : 0}
+                              </Text>
+                            </VStack>
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" color="orange.500">Medium</Text>
+                              <Text fontSize="lg" fontWeight="bold">
+                                {scheduleDisplay.schedule ? 
+                                  scheduleDisplay.schedule.subjects.filter(s => 
+                                    courses.find(c => c.id === s.subjectId)?.priority === 'medium'
+                                  ).length : 0}
+                              </Text>
+                            </VStack>
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" color="green.500">Low</Text>
+                              <Text fontSize="lg" fontWeight="bold">
+                                {scheduleDisplay.schedule ? 
+                                  scheduleDisplay.schedule.subjects.filter(s => 
+                                    courses.find(c => c.id === s.subjectId)?.priority === 'low'
+                                  ).length : 0}
+                              </Text>
+                            </VStack>
+                          </HStack>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+
+                    {/* Current Session Card */}
+                    <Card shadow="md" borderRadius="lg">
+                      <CardBody>
+                        <VStack align="start" spacing={3}>
+                          <HStack>
+                            <Icon as={FaPlay} color="purple.500" boxSize={5} />
+                            <Text color="gray.500" fontSize="sm">Current Session</Text>
+                          </HStack>
+                          {currentSession ? (
+                            <>
+                              <Text fontSize="lg" fontWeight="bold" noOfLines={1}>
+                                {currentSession.currentSubject}
+                              </Text>
+                              <Text fontSize="2xl" fontWeight="bold" fontFamily="mono" color="purple.500">
+                                {formatTime(elapsedTime)}
+                              </Text>
+                              <HStack spacing={2}>
+                                <Badge colorScheme={currentSession.status === 'active' ? 'green' : 'yellow'}>
+                                  {currentSession.status === 'active' ? 'Active' : 'Paused'}
+                                </Badge>
+                              </HStack>
+                            </>
+                          ) : (
+                            <Text fontSize="sm" color="gray.500">No active session</Text>
+                          )}
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  </Grid>
+                  
+                  <Grid templateColumns="repeat(2, 1fr)" gap={8}>
+                    {/* Left Column - Subject Selection and Stats */}
+                    <VStack spacing={6} align="stretch">
+                      {/* Subject Selection Card */}
+                      <Card shadow="md" borderRadius="lg">
+                        <CardHeader borderBottomWidth="1px" pb={4}>
+                          <Heading size="md">Select Subjects</Heading>
+                        </CardHeader>
+                        <CardBody>
+                          <VStack spacing={4} align="stretch">
+                            <List spacing={3} width="full">
+                              {courses.map(course => (
+                                <ListItem key={course.id}>
+                                  <Checkbox
+                                    isChecked={selectedSubjects.includes(course.id)}
+                                    onChange={(e) => {
+                                      if (e.target.checked) {
+                                        setSelectedSubjects([...selectedSubjects, course.id]);
+                                      } else {
+                                        setSelectedSubjects(selectedSubjects.filter(id => id !== course.id));
+                                      }
+                                    }}
+                                    size="lg"
+                                    width="full"
+                                  >
+                                    <HStack justify="space-between" width="full">
+                                      <Text>{course.name}</Text>
+                                      <Badge colorScheme={getPriorityColor(course.priority)}>
+                                        {course.priority}
+                                      </Badge>
+                                    </HStack>
+                                  </Checkbox>
+                                </ListItem>
+                              ))}
+                            </List>
+
+                            <Button 
                               colorScheme="blue"
                               leftIcon={<FaCalendarAlt />}
                               onClick={generateDailySchedule}
                               isLoading={isGeneratingSchedule}
                               isDisabled={selectedSubjects.length === 0}
+                              size="lg"
                               width="full"
                             >
                               Generate Study Schedule
@@ -1087,133 +1448,119 @@ const StudyPlan = () => {
                           </VStack>
                         </CardBody>
                       </Card>
-                    </Box>
+                    </VStack>
 
                     {/* Right Column - Schedule Display */}
                     <Box>
                       {scheduleDisplay.isVisible && scheduleDisplay.schedule ? (
-                        <VStack spacing={4} align="stretch">
-                          <HStack justify="space-between" align="center">
-                            <Heading size="md">Today's Study Schedule</Heading>
-                            <HStack>
-                              <Badge colorScheme="blue" fontSize="sm">
-                                {Math.floor(scheduleDisplay.schedule.totalStudyTime / 60)}h {scheduleDisplay.schedule.totalStudyTime % 60}m
-                              </Badge>
-                            </HStack>
-                          </HStack>
-
-                          {/* Current Session Display */}
-                          {currentSession && (
-                            <Card bg={useColorModeValue('blue.50', 'blue.900')}>
-                              <CardBody>
-                                <VStack spacing={3}>
-                                  <HStack justify="space-between" width="full">
-                                    <VStack align="start" spacing={1}>
-                                      <Text fontWeight="bold">Current Session</Text>
-                                      <Text>{currentSession.currentSubject}</Text>
-                                    </VStack>
-                                    <Text fontSize="2xl" fontWeight="bold" fontFamily="mono">
-                                      {formatTime(elapsedTime)}
-                                    </Text>
-                                  </HStack>
-                                  <ButtonGroup size="lg" isAttached variant="solid">
-                                    {currentSession.status === 'active' ? (
-                                      <IconButton
-                                        aria-label="Pause session"
-                                        icon={<FaPause />}
-                                        colorScheme="yellow"
-                                        onClick={pauseStudySession}
-                                      />
-                                    ) : (
-                                      <IconButton
-                                        aria-label="Resume session"
-                                        icon={<FaPlay />}
-                                        colorScheme="green"
-                                        onClick={resumeStudySession}
-                                      />
-                                    )}
-                                    <IconButton
-                                      aria-label="Stop session"
-                                      icon={<FaStop />}
-                                      colorScheme="red"
-                                      onClick={stopStudySession}
-                                    />
-                                  </ButtonGroup>
-                                </VStack>
-                              </CardBody>
-                            </Card>
-                          )}
-
-                          <Box 
-                            borderLeft="2px solid" 
-                            borderColor="blue.200" 
-                            pl={4}
-                            position="relative"
-                          >
-                            {scheduleDisplay.schedule.subjects.map((subject, index) => (
-                              <Box 
-                                key={subject.subjectId} 
-                                mb={6} 
-                                position="relative"
-                                _before={{
-                                  content: '""',
-                                  position: 'absolute',
-                                  left: '-9px',
-                                  top: '4px',
-                                  width: '4px',
-                                  height: '4px',
-                                  borderRadius: 'full',
-                                  bg: 'blue.500',
-                                  zIndex: 1
-                                }}
-                              >
-                                <HStack 
-                                  spacing={4} 
-                                  p={4} 
-                                  bg={useColorModeValue('white', 'gray.800')}
-                                  borderRadius="md"
-                                  shadow="sm"
-                                  _hover={{ shadow: 'md' }}
-                                  transition="all 0.2s"
+                        <Card shadow="md" borderRadius="lg">
+                          <CardHeader borderBottomWidth="1px" pb={4}>
+                            <Heading size="md">Today's Schedule</Heading>
+                          </CardHeader>
+                          <CardBody>
+                            <Box 
+                              borderLeft="2px solid" 
+                              borderColor="blue.200" 
+                              pl={6}
+                              position="relative"
+                            >
+                              {scheduleDisplay.schedule.subjects.map((subject, index) => (
+                                <Box 
+                                  key={subject.subjectId} 
+                                  mb={8} 
+                                  position="relative"
+                                  _before={{
+                                    content: '""',
+                                    position: 'absolute',
+                                    left: '-9px',
+                                    top: '4px',
+                                    width: '4px',
+                                    height: '4px',
+                                    borderRadius: 'full',
+                                    bg: 'blue.500',
+                                    zIndex: 1
+                                  }}
                                 >
-                                  <VStack align="start" spacing={1} flex={1}>
+                                  <HStack 
+                                    spacing={4} 
+                                    p={4} 
+                                    bg={useColorModeValue('white', 'gray.800')}
+                                    borderRadius="lg"
+                                    shadow="sm"
+                                    _hover={{ shadow: 'md' }}
+                                    transition="all 0.2s"
+                                  >
+                                    <VStack align="start" spacing={2} flex={1}>
+                                      <HStack>
+                                        <Heading size="md">{subject.name}</Heading>
+                                        <Badge colorScheme="blue" fontSize="sm">
+                                          {Math.floor(subject.duration / 60)}h {subject.duration % 60}m
+                                        </Badge>
+                                      </HStack>
+                                      <HStack color="gray.500" fontSize="sm">
+                                        <Icon as={FaClock} />
+                                        <Text>{subject.startTime} - {subject.endTime}</Text>
+                                      </HStack>
+                                    </VStack>
                                     <HStack>
-                                      <Heading size="sm">{subject.name}</Heading>
-                                      <Badge colorScheme="blue">
-                                        {Math.floor(subject.duration / 60)}h {subject.duration % 60}m
-                                      </Badge>
+                                      {currentSession && currentSession.subjectId === subject.subjectId ? (
+                                        <HStack spacing={3}>
+                                          <Text fontSize="lg" fontWeight="bold" fontFamily="mono" color="blue.500">
+                                            {formatTime(elapsedTime)}
+                                          </Text>
+                                          <ButtonGroup size="md" isAttached>
+                                            {currentSession.status === 'active' ? (
+                                              <IconButton
+                                                aria-label="Pause session"
+                                                icon={<FaPause />}
+                                                colorScheme="yellow"
+                                                onClick={pauseStudySession}
+                                              />
+                                            ) : (
+                                              <IconButton
+                                                aria-label="Resume session"
+                                                icon={<FaPlay />}
+                                                colorScheme="green"
+                                                onClick={resumeStudySession}
+                                              />
+                                            )}
+                                            <IconButton
+                                              aria-label="Stop session"
+                                              icon={<FaStop />}
+                                              colorScheme="red"
+                                              onClick={stopStudySession}
+                                            />
+                                          </ButtonGroup>
+                                        </HStack>
+                                      ) : (
+                                        <IconButton
+                                          aria-label="Start study session"
+                                          icon={<FaPlay />}
+                                          colorScheme="green"
+                                          size="md"
+                                          onClick={() => startStudySession(subject)}
+                                          isDisabled={!!currentSession}
+                                        />
+                                      )}
                                     </HStack>
-                                    <HStack color="gray.500" fontSize="sm">
-                                      <Icon as={FaClock} />
-                                      <Text>{subject.startTime} - {subject.endTime}</Text>
-                                    </HStack>
-                                  </VStack>
-                                  <HStack>
-                                    {!currentSession && (
-                                      <IconButton
-                                        aria-label="Start study session"
-                                        icon={<FaPlay />}
-                                        colorScheme="green"
-                                        size="sm"
-                                        onClick={() => startStudySession(subject)}
-                                      />
-                                    )}
                                   </HStack>
-                                </HStack>
-                              </Box>
-                            ))}
-                          </Box>
-                        </VStack>
+                                </Box>
+                              ))}
+                            </Box>
+                          </CardBody>
+                        </Card>
                       ) : (
                         <Center 
                           h="full" 
-                          bg={useColorModeValue('gray.50', 'gray.700')} 
-                          borderRadius="md"
+                          bg={useColorModeValue('white', 'gray.800')} 
+                          borderRadius="lg"
                           p={8}
+                          shadow="md"
                         >
                           <VStack spacing={4} color="gray.500">
-                            <Icon as={FaCalendarAlt} boxSize={8} />
-                            <Text>Select subjects to generate your study schedule</Text>
+                            <Icon as={FaCalendarAlt} boxSize={12} />
+                            <Text fontSize="lg">Select subjects to generate your study schedule</Text>
+                            <Text fontSize="sm" color="gray.400">Choose from your subjects and click "Generate Study Schedule"</Text>
                           </VStack>
                         </Center>
                       )}
