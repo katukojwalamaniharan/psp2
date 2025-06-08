@@ -7,6 +7,8 @@ import Register from './pages/Register'
 import Home from './pages/Home'
 import Profile from './pages/Profile'
 import StudyPlan from './pages/StudyPlan'
+import About from './pages/About'
+import IntroPage from './pages/IntroPage'
 import theme from './theme'
 
 function App() {
@@ -16,7 +18,7 @@ function App() {
       <AuthProvider>
         <Router>
           <Routes>
-            <Route path="/" element={<Navigate to="/login" replace />} />
+            <Route path="/" element={<IntroPage />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route
@@ -40,6 +42,14 @@ function App() {
               element={
                 <PrivateRoute>
                   <StudyPlan />
+                </PrivateRoute>
+              }
+            />
+            <Route
+              path="/about"
+              element={
+                <PrivateRoute>
+                  <About />
                 </PrivateRoute>
               }
             />

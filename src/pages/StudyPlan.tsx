@@ -1507,26 +1507,46 @@ const StudyPlan = () => {
                   </HStack>
 
                   {/* Enhanced Stats Section */}
-                  <Grid templateColumns="repeat(4, 1fr)" gap={6}>
+                  <Grid templateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap={4}>
                     {/* Total Study Time Card */}
-                    <Card shadow="md" borderRadius="lg">
-                      <CardBody>
-                        <VStack align="start" spacing={3}>
+                    <Card 
+                      shadow="lg" 
+                      borderRadius="xl" 
+                      bg={useColorModeValue('white', 'gray.800')}
+                      borderWidth="1px"
+                      borderColor={useColorModeValue('gray.100', 'gray.700')}
+                      _hover={{ transform: 'translateY(-3px)', shadow: '2xl' }}
+                      transition="all 0.3s ease-in-out"
+                    >
+                      <CardBody p={4}>
+                        <VStack align="start" spacing={2}>
                           <HStack>
-                            <Icon as={FaClock} color="blue.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Actual Study Time</Text>
+                            <Icon as={FaClock} color="blue.400" boxSize={5} />
+                            <Text color="gray.500" fontSize="xs" fontWeight="medium">Actual Study Time</Text>
                           </HStack>
-                          <Text fontSize="2xl" fontWeight="bold">
+                          <Text fontSize="2xl" fontWeight="extrabold" color={useColorModeValue('gray.800', 'white')}>
                             {Math.floor(studyMetrics.totalStudyTime / 60)}h {studyMetrics.totalStudyTime % 60}m
                           </Text>
-                          <Progress 
-                            value={(studyMetrics.totalStudyTime / studyMetrics.dailyGoal) * 100} 
-                            colorScheme="blue" 
-                            size="sm" 
-                            width="full"
+                          <Box 
+                            position="relative" 
+                            h="4px" 
+                            bg={useColorModeValue('blue.50', 'blue.900')} 
                             borderRadius="full"
-                          />
-                          <Text fontSize="xs" color="gray.500">
+                            overflow="hidden"
+                            width="full"
+                          >
+                            <Box
+                              position="absolute"
+                              top="0"
+                              left="0"
+                              h="100%"
+                              w={`${(studyMetrics.totalStudyTime / studyMetrics.dailyGoal) * 100}%`}
+                              bg={studyMetrics.totalStudyTime >= studyMetrics.dailyGoal ? 'green.400' : 'blue.400'}
+                              transition="width 0.5s ease-out"
+                              borderRadius="full"
+                            />
+                          </Box>
+                          <Text fontSize="xx-small" color="gray.500" fontWeight="medium">
                             {Math.round((studyMetrics.totalStudyTime / studyMetrics.dailyGoal) * 100)}% of daily goal
                           </Text>
                         </VStack>
@@ -1534,25 +1554,45 @@ const StudyPlan = () => {
                     </Card>
 
                     {/* Sessions Completed Card */}
-                    <Card shadow="md" borderRadius="lg">
-                      <CardBody>
-                        <VStack align="start" spacing={3}>
+                    <Card 
+                      shadow="lg" 
+                      borderRadius="xl" 
+                      bg={useColorModeValue('white', 'gray.800')}
+                      borderWidth="1px"
+                      borderColor={useColorModeValue('gray.100', 'gray.700')}
+                      _hover={{ transform: 'translateY(-3px)', shadow: '2xl' }}
+                      transition="all 0.3s ease-in-out"
+                    >
+                      <CardBody p={4}>
+                        <VStack align="start" spacing={2}>
                           <HStack>
-                            <Icon as={FaCheck} color="green.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Sessions Completed</Text>
+                            <Icon as={FaCheck} color="green.400" boxSize={5} />
+                            <Text color="gray.500" fontSize="xs" fontWeight="medium">Sessions Completed</Text>
                           </HStack>
-                          <Text fontSize="2xl" fontWeight="bold">
+                          <Text fontSize="2xl" fontWeight="extrabold" color={useColorModeValue('gray.800', 'white')}>
                             {studyMetrics.sessionsCompleted}
                           </Text>
-                          <Progress 
-                            value={scheduleDisplay.schedule ? 
-                              (studyMetrics.sessionsCompleted / scheduleDisplay.schedule.subjects.length) * 100 : 0} 
-                            colorScheme="green" 
-                            size="sm" 
-                            width="full"
+                          <Box 
+                            position="relative" 
+                            h="4px" 
+                            bg={useColorModeValue('green.50', 'green.900')} 
                             borderRadius="full"
-                          />
-                          <Text fontSize="xs" color="gray.500">
+                            overflow="hidden"
+                            width="full"
+                          >
+                            <Box
+                              position="absolute"
+                              top="0"
+                              left="0"
+                              h="100%"
+                              w={scheduleDisplay.schedule ? 
+                                `${(studyMetrics.sessionsCompleted / scheduleDisplay.schedule.subjects.length) * 100}%` : '0%'}
+                              bg="green.400"
+                              transition="width 0.5s ease-out"
+                              borderRadius="full"
+                            />
+                          </Box>
+                          <Text fontSize="xx-small" color="gray.500" fontWeight="medium">
                             of {scheduleDisplay.schedule ? scheduleDisplay.schedule.subjects.length : 0} planned sessions
                           </Text>
                         </VStack>
@@ -1560,24 +1600,44 @@ const StudyPlan = () => {
                     </Card>
 
                     {/* Active Streak Card */}
-                    <Card shadow="md" borderRadius="lg">
-                      <CardBody>
-                        <VStack align="start" spacing={3}>
+                    <Card 
+                      shadow="lg" 
+                      borderRadius="xl" 
+                      bg={useColorModeValue('white', 'gray.800')}
+                      borderWidth="1px"
+                      borderColor={useColorModeValue('gray.100', 'gray.700')}
+                      _hover={{ transform: 'translateY(-3px)', shadow: '2xl' }}
+                      transition="all 0.3s ease-in-out"
+                    >
+                      <CardBody p={4}>
+                        <VStack align="start" spacing={2}>
                           <HStack>
-                            <Icon as={FaFire} color="orange.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Active Streak</Text>
+                            <Icon as={FaFire} color="orange.400" boxSize={5} />
+                            <Text color="gray.500" fontSize="xs" fontWeight="medium">Active Streak</Text>
                           </HStack>
-                          <Text fontSize="2xl" fontWeight="bold">
+                          <Text fontSize="2xl" fontWeight="extrabold" color={useColorModeValue('gray.800', 'white')}>
                             {studyMetrics.activeStreak} days
                           </Text>
-                          <Progress 
-                            value={(studyMetrics.activeStreak / 7) * 100} 
-                            colorScheme="orange" 
-                            size="sm" 
-                            width="full"
+                          <Box 
+                            position="relative" 
+                            h="4px" 
+                            bg={useColorModeValue('orange.50', 'orange.900')} 
                             borderRadius="full"
-                          />
-                          <Text fontSize="xs" color="gray.500">
+                            overflow="hidden"
+                            width="full"
+                          >
+                            <Box
+                              position="absolute"
+                              top="0"
+                              left="0"
+                              h="100%"
+                              w={`${(studyMetrics.activeStreak / 7) * 100}%`}
+                              bg="orange.400"
+                              transition="width 0.5s ease-out"
+                              borderRadius="full"
+                            />
+                          </Box>
+                          <Text fontSize="xx-small" color="gray.500" fontWeight="medium">
                             {studyMetrics.activeStreak >= 7 ? '🔥 Amazing streak!' : 'Keep going!'}
                           </Text>
                         </VStack>
@@ -1585,29 +1645,40 @@ const StudyPlan = () => {
                     </Card>
 
                     {/* Current Session Card */}
-                    <Card shadow="md" borderRadius="lg">
-                      <CardBody>
-                        <VStack align="start" spacing={3}>
+                    <Card 
+                      shadow="lg" 
+                      borderRadius="xl" 
+                      bg={useColorModeValue('white', 'gray.800')}
+                      borderWidth="1px"
+                      borderColor={useColorModeValue('gray.100', 'gray.700')}
+                      _hover={{ transform: 'translateY(-3px)', shadow: '2xl' }}
+                      transition="all 0.3s ease-in-out"
+                    >
+                      <CardBody p={4}>
+                        <VStack align="start" spacing={2}>
                           <HStack>
-                            <Icon as={FaPlay} color="purple.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Current Session</Text>
+                            <Icon as={FaPlay} color="purple.400" boxSize={5} />
+                            <Text color="gray.500" fontSize="xs" fontWeight="medium">Current Session</Text>
                           </HStack>
                           {currentSession ? (
                             <>
-                              <Text fontSize="lg" fontWeight="bold" noOfLines={1}>
+                              <Text fontSize="lg" fontWeight="bold" noOfLines={1} color={useColorModeValue('gray.800', 'white')}>
                                 {currentSession.currentSubject}
                               </Text>
-                              <Text fontSize="2xl" fontWeight="bold" fontFamily="mono" color="purple.500">
+                              <Text fontSize="2xl" fontWeight="extrabold" fontFamily="mono" color="purple.400">
                                 {formatTime(elapsedTime)}
                               </Text>
-                              <HStack spacing={2}>
-                                <Badge colorScheme={currentSession.status === 'active' ? 'green' : 'yellow'}>
+                              <HStack spacing={1}>
+                                <Badge colorScheme={currentSession.status === 'active' ? 'green' : 'yellow'} variant="solid" px={2} py={1} borderRadius="full" fontSize="xx-small">
                                   {currentSession.status === 'active' ? 'Active' : 'Paused'}
                                 </Badge>
                               </HStack>
                             </>
                           ) : (
-                            <Text fontSize="sm" color="gray.500">No active session</Text>
+                            <VStack align="center" justify="center" h="full" w="full" py={2}>
+                              <Icon as={FaPlay} boxSize={8} color="gray.300" />
+                              <Text fontSize="xx-small" color="gray.500" textAlign="center">No active session</Text>
+                            </VStack>
                           )}
                         </VStack>
                       </CardBody>

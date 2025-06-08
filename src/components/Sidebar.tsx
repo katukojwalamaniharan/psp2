@@ -31,6 +31,7 @@ import {
   FaSignOutAlt,
   FaUser,
   FaBars,
+  FaInfoCircle,
 } from 'react-icons/fa';
 
 const Sidebar = () => {
@@ -48,6 +49,7 @@ const Sidebar = () => {
     { icon: FaBook, label: 'Study Plan', path: '/study-plan' },
     { icon: FaCalendarAlt, label: 'Schedule', path: '/schedule' },
     { icon: FaChartLine, label: 'Progress', path: '/progress' },
+    { icon: FaInfoCircle, label: 'About', path: '/about' },
   ];
 
   const isActive = (path: string) => location.pathname === path;
