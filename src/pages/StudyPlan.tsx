@@ -63,7 +63,7 @@ import {
   useColorMode,
   Spinner
 } from '@chakra-ui/react';
-import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause, FaBook } from 'react-icons/fa';
+import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause, FaBook, FaFire } from 'react-icons/fa';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -78,7 +78,8 @@ import {
   doc,
   updateDoc,
   orderBy,
-  getDoc
+  getDoc,
+  limit
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
 
@@ -181,6 +182,16 @@ type StudySession = {
   currentSubject: string;
 };
 
+// Add new types for study metrics
+type StudyMetrics = {
+  totalStudyTime: number;
+  completedSubjects: number;
+  activeStreak: number;
+  lastStudyDate: string | null;
+  dailyGoal: number;
+  sessionsCompleted: number;
+};
+
 const StudyPlan = () => {
   // All useState hooks
   const [courses, setCourses] = useState<Course[]>([]);
@@ -225,6 +236,14 @@ const StudyPlan = () => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
   const [savedSchedules, setSavedSchedules] = useState<DailySchedule[]>([]);
+  const [studyMetrics, setStudyMetrics] = useState<StudyMetrics>({
+    totalStudyTime: 0,
+    completedSubjects: 0,
+    activeStreak: 0,
+    lastStudyDate: null,
+    dailyGoal: 8 * 60, // 8 hours in minutes
+    sessionsCompleted: 0
+  });
 
   // All useRef hooks
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -1018,6 +1037,64 @@ const StudyPlan = () => {
     }
   };
 
+  // Add useEffect to fetch and calculate study metrics
+  useEffect(() => {
+    if (!currentUser || !selectedDate) return;
+
+    const fetchStudyMetrics = async () => {
+      try {
+        // Fetch today's study sessions
+        const sessionsQuery = query(
+          collection(db, 'user_study_plans', currentUser.uid, 'study_sessions'),
+          where('date', '==', selectedDate)
+        );
+        
+        const sessionsSnapshot = await getDocs(sessionsQuery);
+        const sessions = sessionsSnapshot.docs.map(doc => doc.data());
+        
+        // Calculate metrics
+        const totalTime = sessions.reduce((acc, session) => acc + (session.duration || 0), 0);
+        const completed = sessions.filter(s => s.status === 'completed').length;
+        
+        // Calculate streak
+        const streakQuery = query(
+          collection(db, 'user_study_plans', currentUser.uid, 'study_sessions'),
+          orderBy('date', 'desc'),
+          limit(30) // Look at last 30 days
+        );
+        
+        const streakSnapshot = await getDocs(streakQuery);
+        const streakData = streakSnapshot.docs.map(doc => doc.data());
+        
+        let streak = 0;
+        let currentDate = new Date(selectedDate);
+        
+        for (let i = 0; i < streakData.length; i++) {
+          const sessionDate = new Date(streakData[i].date);
+          if (sessionDate.toDateString() === currentDate.toDateString()) {
+            streak++;
+            currentDate.setDate(currentDate.getDate() - 1);
+          } else {
+            break;
+          }
+        }
+
+        setStudyMetrics({
+          totalStudyTime: totalTime,
+          completedSubjects: completed,
+          activeStreak: streak,
+          lastStudyDate: sessions.length > 0 ? sessions[0].date : null,
+          dailyGoal: 8 * 60,
+          sessionsCompleted: completed
+        });
+      } catch (error) {
+        console.error('Error fetching study metrics:', error);
+      }
+    };
+
+    fetchStudyMetrics();
+  }, [currentUser, selectedDate, currentSession]);
+
   // Add loading state
   if (authLoading) {
     return (
@@ -1067,7 +1144,7 @@ const StudyPlan = () => {
         <Container maxW="container.xl">
           <Tabs variant="enclosed" colorScheme="blue">
             <TabList>
-              <Tab>All Subjects</Tab>
+              <Tab>Study Planner</Tab>
               <Tab>Daily Planner</Tab>
             </TabList>
 
@@ -1075,7 +1152,7 @@ const StudyPlan = () => {
               <TabPanel>
                 <VStack spacing={6} align="stretch">
                   <HStack justify="space-between" align="center">
-                    <Heading size="lg">All Subjects</Heading>
+                    <Heading size="lg">Study Planner</Heading>
                     <Button 
                       leftIcon={<FaPlus />} 
                       colorScheme="blue" 
@@ -1212,7 +1289,7 @@ const StudyPlan = () => {
 
                               <HStack justify="space-between">
                                 <VStack align="start" spacing={1}>
-                                  <Text color="gray.500" fontSize="sm">Study Time</Text>
+                                  <Text color="gray.500" fontSize="sm">Target Hours</Text>
                                   <Text fontWeight="medium">
                                     {course.dailyStudyTime?.hours || 0}h {course.dailyStudyTime?.minutes || 0}m
                                   </Text>
@@ -1224,14 +1301,14 @@ const StudyPlan = () => {
                               </HStack>
 
                               <ButtonGroup size="sm" isAttached width="full">
-                                <Button
+                                <Button 
                                   flex={1}
                                   onClick={() => handleUpdateProgress(course.id, Math.max(0, course.progress - 10))}
                                   isDisabled={course.progress <= 0}
                                 >
                                   -10%
                                 </Button>
-                                <Button
+                                <Button 
                                   flex={1}
                                   onClick={() => handleUpdateProgress(course.id, Math.min(100, course.progress + 10))}
                                   isDisabled={course.progress >= 100}
@@ -1251,11 +1328,11 @@ const StudyPlan = () => {
                 <VStack spacing={8} align="stretch">
                   {/* Header Section */}
                   <HStack justify="space-between" align="center" bg={useColorModeValue('white', 'gray.800')} p={4} borderRadius="lg" shadow="sm">
-                    <Heading size="lg">Daily Study Planner</Heading>
+                    <Heading size="lg">Daily Planner</Heading>
                     <HStack spacing={4}>
                       <Button
                         leftIcon={<FaCalendarAlt />}
-                        onClick={() => setSelectedDate(new Date().toISOString().split('T')[0])}
+                        onClick={() => handleDateChange(new Date().toISOString().split('T')[0])}
                         variant="outline"
                         size="md"
                       >
@@ -1279,91 +1356,72 @@ const StudyPlan = () => {
                         <VStack align="start" spacing={3}>
                           <HStack>
                             <Icon as={FaClock} color="blue.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Total Study Time</Text>
+                            <Text color="gray.500" fontSize="sm">Actual Study Time</Text>
                           </HStack>
                           <Text fontSize="2xl" fontWeight="bold">
-                            {scheduleDisplay.schedule ? 
-                              `${Math.floor(scheduleDisplay.schedule.totalStudyTime / 60)}h ${scheduleDisplay.schedule.totalStudyTime % 60}m` 
-                              : '0h 0m'}
+                            {Math.floor(studyMetrics.totalStudyTime / 60)}h {studyMetrics.totalStudyTime % 60}m
                           </Text>
                           <Progress 
-                            value={scheduleDisplay.schedule ? (scheduleDisplay.schedule.totalStudyTime / (8 * 60)) * 100 : 0} 
+                            value={(studyMetrics.totalStudyTime / studyMetrics.dailyGoal) * 100} 
                             colorScheme="blue" 
                             size="sm" 
                             width="full"
                             borderRadius="full"
                           />
                           <Text fontSize="xs" color="gray.500">
-                            {scheduleDisplay.schedule ? 
-                              `${Math.round((scheduleDisplay.schedule.totalStudyTime / (8 * 60)) * 100)}% of daily goal` 
-                              : '0% of daily goal'}
+                            {Math.round((studyMetrics.totalStudyTime / studyMetrics.dailyGoal) * 100)}% of daily goal
                           </Text>
                         </VStack>
                       </CardBody>
                     </Card>
 
-                    {/* Subjects Planned Card */}
+                    {/* Sessions Completed Card */}
                     <Card shadow="md" borderRadius="lg">
                       <CardBody>
                         <VStack align="start" spacing={3}>
                           <HStack>
-                            <Icon as={FaBook} color="green.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Subjects Planned</Text>
+                            <Icon as={FaCheck} color="green.500" boxSize={5} />
+                            <Text color="gray.500" fontSize="sm">Sessions Completed</Text>
                           </HStack>
                           <Text fontSize="2xl" fontWeight="bold">
-                            {scheduleDisplay.schedule ? scheduleDisplay.schedule.subjects.length : 0}
+                            {studyMetrics.sessionsCompleted}
                           </Text>
                           <Progress 
-                            value={scheduleDisplay.schedule ? (scheduleDisplay.schedule.subjects.length / courses.length) * 100 : 0} 
+                            value={scheduleDisplay.schedule ? 
+                              (studyMetrics.sessionsCompleted / scheduleDisplay.schedule.subjects.length) * 100 : 0} 
                             colorScheme="green" 
                             size="sm" 
                             width="full"
                             borderRadius="full"
                           />
                           <Text fontSize="xs" color="gray.500">
-                            of {courses.length} total subjects
+                            of {scheduleDisplay.schedule ? scheduleDisplay.schedule.subjects.length : 0} planned sessions
                           </Text>
                         </VStack>
                       </CardBody>
                     </Card>
 
-                    {/* Priority Distribution Card */}
+                    {/* Active Streak Card */}
                     <Card shadow="md" borderRadius="lg">
                       <CardBody>
                         <VStack align="start" spacing={3}>
                           <HStack>
-                            <Icon as={FaFlag} color="orange.500" boxSize={5} />
-                            <Text color="gray.500" fontSize="sm">Priority Distribution</Text>
+                            <Icon as={FaFire} color="orange.500" boxSize={5} />
+                            <Text color="gray.500" fontSize="sm">Active Streak</Text>
                           </HStack>
-                          <HStack spacing={4} width="full">
-                            <VStack align="start" spacing={1}>
-                              <Text fontSize="sm" color="red.500">High</Text>
-                              <Text fontSize="lg" fontWeight="bold">
-                                {scheduleDisplay.schedule ? 
-                                  scheduleDisplay.schedule.subjects.filter(s => 
-                                    courses.find(c => c.id === s.subjectId)?.priority === 'high'
-                                  ).length : 0}
-                              </Text>
-                            </VStack>
-                            <VStack align="start" spacing={1}>
-                              <Text fontSize="sm" color="orange.500">Medium</Text>
-                              <Text fontSize="lg" fontWeight="bold">
-                                {scheduleDisplay.schedule ? 
-                                  scheduleDisplay.schedule.subjects.filter(s => 
-                                    courses.find(c => c.id === s.subjectId)?.priority === 'medium'
-                                  ).length : 0}
-                              </Text>
-                            </VStack>
-                            <VStack align="start" spacing={1}>
-                              <Text fontSize="sm" color="green.500">Low</Text>
-                              <Text fontSize="lg" fontWeight="bold">
-                                {scheduleDisplay.schedule ? 
-                                  scheduleDisplay.schedule.subjects.filter(s => 
-                                    courses.find(c => c.id === s.subjectId)?.priority === 'low'
-                                  ).length : 0}
-                              </Text>
-                            </VStack>
-                          </HStack>
+                          <Text fontSize="2xl" fontWeight="bold">
+                            {studyMetrics.activeStreak} days
+                          </Text>
+                          <Progress 
+                            value={(studyMetrics.activeStreak / 7) * 100} 
+                            colorScheme="orange" 
+                            size="sm" 
+                            width="full"
+                            borderRadius="full"
+                          />
+                          <Text fontSize="xs" color="gray.500">
+                            {studyMetrics.activeStreak >= 7 ? '🔥 Amazing streak!' : 'Keep going!'}
+                          </Text>
                         </VStack>
                       </CardBody>
                     </Card>
@@ -1399,52 +1457,68 @@ const StudyPlan = () => {
                   </Grid>
                   
                   <Grid templateColumns="repeat(2, 1fr)" gap={8}>
-                    {/* Left Column - Subject Selection and Stats */}
+                    {/* Left Column - Subject Selection */}
                     <VStack spacing={6} align="stretch">
-                      {/* Subject Selection Card */}
                       <Card shadow="md" borderRadius="lg">
                         <CardHeader borderBottomWidth="1px" pb={4}>
-                          <Heading size="md">Select Subjects</Heading>
+                          <Heading size="md">Select Subjects for Today</Heading>
                         </CardHeader>
                         <CardBody>
                           <VStack spacing={4} align="stretch">
-                            <List spacing={3} width="full">
-                              {courses.map(course => (
-                                <ListItem key={course.id}>
-                                  <Checkbox
-                                    isChecked={selectedSubjects.includes(course.id)}
-                                    onChange={(e) => {
-                                      if (e.target.checked) {
-                                        setSelectedSubjects([...selectedSubjects, course.id]);
-                                      } else {
-                                        setSelectedSubjects(selectedSubjects.filter(id => id !== course.id));
-                                      }
-                                    }}
-                                    size="lg"
-                                    width="full"
-                                  >
-                                    <HStack justify="space-between" width="full">
-                                      <Text>{course.name}</Text>
-                                      <Badge colorScheme={getPriorityColor(course.priority)}>
-                                        {course.priority}
-                                      </Badge>
-                                    </HStack>
-                                  </Checkbox>
-                                </ListItem>
-                              ))}
-                            </List>
+                            {courses.length === 0 ? (
+                              <Alert status="info" borderRadius="md">
+                                <AlertIcon />
+                                <AlertTitle>No Subjects Available</AlertTitle>
+                                <AlertDescription>
+                                  Please add subjects in the Study Planner first.
+                                </AlertDescription>
+                              </Alert>
+                            ) : (
+                              <>
+                                <List spacing={3} width="full">
+                                  {courses.map(course => (
+                                    <ListItem key={course.id}>
+                                      <Checkbox
+                                        isChecked={selectedSubjects.includes(course.id)}
+                                        onChange={(e) => {
+                                          if (e.target.checked) {
+                                            setSelectedSubjects([...selectedSubjects, course.id]);
+                                          } else {
+                                            setSelectedSubjects(selectedSubjects.filter(id => id !== course.id));
+                                          }
+                                        }}
+                                        size="lg"
+                                        width="full"
+                                      >
+                                        <HStack justify="space-between" width="full">
+                                          <VStack align="start" spacing={0}>
+                                            <Text>{course.name}</Text>
+                                            <Text fontSize="sm" color="gray.500">
+                                              Target: {course.dailyStudyTime?.hours || 0}h {course.dailyStudyTime?.minutes || 0}m
+                                            </Text>
+                                          </VStack>
+                                          <Badge colorScheme={getPriorityColor(course.priority)}>
+                                            {course.priority}
+                                          </Badge>
+                                        </HStack>
+                                      </Checkbox>
+                                    </ListItem>
+                                  ))}
+                                </List>
 
-                            <Button 
-                              colorScheme="blue"
-                              leftIcon={<FaCalendarAlt />}
-                              onClick={generateDailySchedule}
-                              isLoading={isGeneratingSchedule}
-                              isDisabled={selectedSubjects.length === 0}
-                              size="lg"
-                              width="full"
-                            >
-                              Generate Study Schedule
-                            </Button>
+                                <Button 
+                                  colorScheme="blue"
+                                  leftIcon={<FaCalendarAlt />}
+                                  onClick={generateDailySchedule}
+                                  isLoading={isGeneratingSchedule}
+                                  isDisabled={selectedSubjects.length === 0}
+                                  size="lg"
+                                  width="full"
+                                >
+                                  Generate Today's Schedule
+                                </Button>
+                              </>
+                            )}
                           </VStack>
                         </CardBody>
                       </Card>
@@ -1560,7 +1634,7 @@ const StudyPlan = () => {
                           <VStack spacing={4} color="gray.500">
                             <Icon as={FaCalendarAlt} boxSize={12} />
                             <Text fontSize="lg">Select subjects to generate your study schedule</Text>
-                            <Text fontSize="sm" color="gray.400">Choose from your subjects and click "Generate Study Schedule"</Text>
+                            <Text fontSize="sm" color="gray.400">Choose from your subjects and click "Generate Today's Schedule"</Text>
                           </VStack>
                         </Center>
                       )}
