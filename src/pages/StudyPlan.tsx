@@ -61,9 +61,16 @@ import {
   ButtonGroup,
   IconButton,
   useColorMode,
-  Spinner
+  Spinner,
+  SimpleGrid,
+  Tag,
+  TagLabel,
+  TagCloseButton,
+  Wrap,
+  WrapItem,
+  Textarea
 } from '@chakra-ui/react';
-import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause, FaBook, FaFire } from 'react-icons/fa';
+import { FaPlus, FaFlag, FaSearch, FaSort, FaFilter, FaCalendarAlt, FaClock, FaCheck, FaPlay, FaStop, FaPause, FaBook, FaFire, FaTrash } from 'react-icons/fa';
 import Sidebar from '../components/Sidebar';
 import { useAuth } from '../contexts/AuthContext';
 import { 
@@ -120,6 +127,7 @@ type Course = {
   color: string;
   createdAt: any;
   userId: string;
+  category: string;
 };
 
 // Add new type for daily schedule
@@ -192,6 +200,23 @@ type StudyMetrics = {
   sessionsCompleted: number;
 };
 
+// Add new types for subject templates and categories
+type SubjectTemplate = {
+  id: string;
+  name: string;
+  category: string;
+  defaultHours: number;
+  defaultDifficulty: 'beginner' | 'intermediate' | 'advanced';
+  description: string;
+};
+
+type SubjectCategory = {
+  id: string;
+  name: string;
+  color: string;
+  icon: string;
+};
+
 const StudyPlan = () => {
   // All useState hooks
   const [courses, setCourses] = useState<Course[]>([]);
@@ -204,8 +229,6 @@ const StudyPlan = () => {
   const [endDate, setEndDate] = useState('');
   const [topics, setTopics] = useState<string[]>([]);
   const [newTopic, setNewTopic] = useState('');
-  const [dailyStudyTime, setDailyStudyTime] = useState({ hours: 0, minutes: 30 });
-  const [studyDays, setStudyDays] = useState<string[]>([]);
   const [progress, setProgress] = useState(0);
   const [resources, setResources] = useState<string[]>([]);
   const [newResource, setNewResource] = useState('');
@@ -216,13 +239,8 @@ const StudyPlan = () => {
     longBreakDuration: 15,
     sessionsUntilLongBreak: 4
   });
-  const [color, setColor] = useState('#3182CE');
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [sortBy, setSortBy] = useState<'priority' | 'progress' | 'name'>('priority');
-  const [filterPriority, setFilterPriority] = useState<'all' | 'high' | 'medium' | 'low'>('all');
-  const [filterDifficulty, setFilterDifficulty] = useState<'all' | 'beginner' | 'intermediate' | 'advanced'>('all');
   const [selectedDate, setSelectedDate] = useState('');
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [dailySchedule, setDailySchedule] = useState<DailySchedule | null>(null);
@@ -244,6 +262,12 @@ const StudyPlan = () => {
     dailyGoal: 8 * 60, // 8 hours in minutes
     sessionsCompleted: 0
   });
+
+  // Add new state for wizard and templates
+  const [wizardStep, setWizardStep] = useState(1);
+  const [selectedTemplate, setSelectedTemplate] = useState<SubjectTemplate | null>(null);
+  const [quickAddInput, setQuickAddInput] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // All useRef hooks
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -323,6 +347,34 @@ const StudyPlan = () => {
       breakAfter: 10
     }
   };
+
+  // Add predefined templates
+  const subjectTemplates: SubjectTemplate[] = [
+    {
+      id: 'os',
+      name: 'Operating Systems',
+      category: 'Core',
+      defaultHours: 40,
+      defaultDifficulty: 'intermediate',
+      description: 'Learn OS concepts, processes, memory management, and file systems'
+    },
+    {
+      id: 'dsa',
+      name: 'Data Structures & Algorithms',
+      category: 'Core',
+      defaultHours: 60,
+      defaultDifficulty: 'intermediate',
+      description: 'Master fundamental data structures and algorithms'
+    },
+    // Add more templates...
+  ];
+
+  const categories: SubjectCategory[] = [
+    { id: 'core', name: 'Core', color: 'blue', icon: 'FaBook' },
+    { id: 'project', name: 'Project', color: 'green', icon: 'FaCode' },
+    { id: 'theory', name: 'Theory', color: 'purple', icon: 'FaLightbulb' },
+    { id: 'practice', name: 'Practice', color: 'orange', icon: 'FaTools' }
+  ];
 
   // All useEffect hooks
   useEffect(() => {
@@ -454,8 +506,6 @@ const StudyPlan = () => {
         startDate: startDate || '',
         endDate: endDate || '',
         topics: topics || [],
-        dailyStudyTime: dailyStudyTime || { hours: 0, minutes: 30 },
-        studyDays: studyDays || [],
         progress: progress || 0,
         lastStudiedDate: null,
         streak: 0,
@@ -471,7 +521,7 @@ const StudyPlan = () => {
           longBreakDuration: 15,
           sessionsUntilLongBreak: 4
         },
-        color: color || '#3182CE',
+        category: selectedCategory,
         userId: currentUser.uid,
         createdAt: serverTimestamp()
       };
@@ -490,8 +540,6 @@ const StudyPlan = () => {
       setStartDate('');
       setEndDate('');
       setTopics([]);
-      setDailyStudyTime({ hours: 0, minutes: 30 });
-      setStudyDays([]);
       setProgress(0);
       setResources([]);
       setRelatedCourse(null);
@@ -501,7 +549,6 @@ const StudyPlan = () => {
         longBreakDuration: 15,
         sessionsUntilLongBreak: 4
       });
-      setColor('#3182CE');
       addCourseModal.onClose();
 
       toast({
@@ -530,16 +577,13 @@ const StudyPlan = () => {
     if (!currentUser) return;
 
     try {
-      console.log('Updating course progress:', { courseId, newProgress });
       const courseRef = doc(db, 'user_study_plans', currentUser.uid, 'courses', courseId);
       await updateDoc(courseRef, {
         progress: newProgress,
         updatedAt: serverTimestamp()
       });
-      console.log('Progress updated successfully');
     } catch (error: any) {
       console.error('Error updating progress:', error);
-      setError(error.message || 'Failed to update progress');
       toast({
         title: 'Error',
         description: error.message || 'Failed to update progress',
@@ -1095,6 +1139,21 @@ const StudyPlan = () => {
     fetchStudyMetrics();
   }, [currentUser, selectedDate, currentSession]);
 
+  // Add drag and drop functionality
+  const onDragEnd = (result: any) => {
+    if (!result.destination) return;
+
+    const items = Array.from(courses);
+    const [reorderedItem] = items.splice(result.source.index, 1);
+    items.splice(result.destination.index, 0, reorderedItem);
+
+    setCourses(items);
+    // Update priority in Firebase
+    items.forEach((course, index) => {
+      handleUpdatePriority(course.id, course.priority);
+    });
+  };
+
   // Add loading state
   if (authLoading) {
     return (
@@ -1156,96 +1215,76 @@ const StudyPlan = () => {
                     <Button 
                       leftIcon={<FaPlus />} 
                       colorScheme="blue" 
-                      onClick={addCourseModal.onOpen}
-                      isLoading={isLoading}
+                      onClick={() => {
+                        setWizardStep(1);
+                        addCourseModal.onOpen();
+                      }}
                     >
                       Add Subject
                     </Button>
                   </HStack>
 
-                  {/* Search and Filter Bar */}
-                  <Card>
-                    <CardBody>
-                      <HStack spacing={4}>
-                        <InputGroup>
-                          <InputLeftElement>
-                            <Icon as={FaSearch} color="gray.400" />
-                          </InputLeftElement>
-                          <Input
-                            placeholder="Search subjects..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                          />
-                        </InputGroup>
-                        <Select
-                          value={sortBy}
-                          onChange={(e) => setSortBy(e.target.value as 'priority' | 'progress' | 'name')}
-                          width="200px"
-                        >
-                          <option value="priority">Sort by Priority</option>
-                          <option value="progress">Sort by Progress</option>
-                          <option value="name">Sort by Name</option>
-                        </Select>
-                        <Menu>
-                          <MenuButton as={Button} rightIcon={<FaFilter />}>
-                            Filter
-                          </MenuButton>
-                          <MenuList>
-                            <MenuItem onClick={() => setFilterPriority('all')}>All Priorities</MenuItem>
-                            <MenuItem onClick={() => setFilterPriority('high')}>High Priority</MenuItem>
-                            <MenuItem onClick={() => setFilterPriority('medium')}>Medium Priority</MenuItem>
-                            <MenuItem onClick={() => setFilterPriority('low')}>Low Priority</MenuItem>
-                            <MenuDivider />
-                            <MenuItem onClick={() => setFilterDifficulty('all')}>All Difficulties</MenuItem>
-                            <MenuItem onClick={() => setFilterDifficulty('beginner')}>Beginner</MenuItem>
-                            <MenuItem onClick={() => setFilterDifficulty('intermediate')}>Intermediate</MenuItem>
-                            <MenuItem onClick={() => setFilterDifficulty('advanced')}>Advanced</MenuItem>
-                          </MenuList>
-                        </Menu>
-                      </HStack>
-                    </CardBody>
-                  </Card>
+                  {/* Category Filter */}
+                  <HStack spacing={4} overflowX="auto" py={2}>
+                    <Button
+                      size="sm"
+                      variant={selectedCategory === 'all' ? 'solid' : 'outline'}
+                      onClick={() => setSelectedCategory('all')}
+                    >
+                      All
+                    </Button>
+                    {categories.map(category => (
+                      <Button
+                        key={category.id}
+                        size="sm"
+                        variant={selectedCategory === category.id ? 'solid' : 'outline'}
+                        colorScheme={category.color}
+                        leftIcon={<Icon as={FaBook} />}
+                        onClick={() => setSelectedCategory(category.id)}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </HStack>
 
-                  {/* Subjects Grid */}
+                  {/* Subject Cards Grid */}
                   <Grid templateColumns="repeat(auto-fill, minmax(300px, 1fr))" gap={6}>
                     {courses
-                      .filter(course => 
-                        course.name.toLowerCase().includes(searchQuery.toLowerCase()) &&
-                        (filterPriority === 'all' || course.priority === filterPriority) &&
-                        (filterDifficulty === 'all' || course.difficulty === filterDifficulty)
-                      )
-                      .sort((a, b) => {
-                        if (sortBy === 'priority') {
-                          const priorityOrder = { high: 3, medium: 2, low: 1 };
-                          return priorityOrder[b.priority] - priorityOrder[a.priority];
-                        }
-                        if (sortBy === 'progress') {
-                          return b.progress - a.progress;
-                        }
-                        return a.name.localeCompare(b.name);
-                      })
+                      .filter(course => selectedCategory === 'all' || course.category === selectedCategory)
                       .map((course) => (
-                        <Card 
+                        <Card
                           key={course.id}
-                          borderLeft="4px solid"
-                          borderLeftColor={getPriorityColor(course.priority)}
                           _hover={{ transform: 'translateY(-2px)', shadow: 'lg' }}
                           transition="all 0.2s"
+                          cursor="pointer"
+                          bg={useColorModeValue('white', 'gray.800')}
+                          borderWidth="1px"
+                          borderColor={useColorModeValue('gray.200', 'gray.700')}
+                          position="relative"
                         >
                           <CardBody>
                             <VStack align="stretch" spacing={4}>
                               <HStack justify="space-between">
-                                <VStack align="start" spacing={1}>
-                                  <Heading size="md">{course.name}</Heading>
-                                  <HStack>
-                                    <Badge colorScheme={getPriorityColor(course.priority)}>
-                                      {course.priority}
-                                    </Badge>
-                                    <Badge colorScheme={course.difficulty === 'advanced' ? 'red' : course.difficulty === 'intermediate' ? 'orange' : 'green'}>
-                                      {course.difficulty}
-                                    </Badge>
-                                  </HStack>
-                                </VStack>
+                                <Tooltip label="Click to edit subject details" placement="top">
+                                  <Heading 
+                                    size="md" 
+                                    fontWeight="600"
+                                    onClick={() => {
+                                      setNewCourse(course.name);
+                                      setDescription(course.description || '');
+                                      setDuration(course.duration || { hours: 1, minutes: 0 });
+                                      setDifficulty(course.difficulty || 'beginner');
+                                      setPriority(course.priority || 'medium');
+                                      setSelectedCategory(course.category || 'core');
+                                      setTopics(course.topics || []);
+                                      addCourseModal.onOpen();
+                                    }}
+                                    cursor="pointer"
+                                    _hover={{ color: 'blue.500' }}
+                                  >
+                                    {course.name}
+                                  </Heading>
+                                </Tooltip>
                                 <Menu>
                                   <MenuButton
                                     as={IconButton}
@@ -1255,71 +1294,190 @@ const StudyPlan = () => {
                                   />
                                   <MenuList>
                                     <MenuItem onClick={() => handleUpdatePriority(course.id, 'high')}>
-                                      Set High Priority
+                                      <HStack>
+                                        <Icon as={FaFlag} color="red.500" />
+                                        <Text>Set High Priority</Text>
+                                      </HStack>
                                     </MenuItem>
                                     <MenuItem onClick={() => handleUpdatePriority(course.id, 'medium')}>
-                                      Set Medium Priority
+                                      <HStack>
+                                        <Icon as={FaFlag} color="orange.500" />
+                                        <Text>Set Medium Priority</Text>
+                                      </HStack>
                                     </MenuItem>
                                     <MenuItem onClick={() => handleUpdatePriority(course.id, 'low')}>
-                                      Set Low Priority
+                                      <HStack>
+                                        <Icon as={FaFlag} color="green.500" />
+                                        <Text>Set Low Priority</Text>
+                                      </HStack>
                                     </MenuItem>
                                     <MenuDivider />
                                     <MenuItem 
                                       color="red.500"
-                                      onClick={() => handleDeleteCourse(course.id)}
+                                      onClick={() => {
+                                        if (window.confirm('Are you sure you want to delete this subject?')) {
+                                          handleDeleteCourse(course.id);
+                                        }
+                                      }}
                                     >
-                                      Delete Subject
+                                      <HStack>
+                                        <Icon as={FaTrash} />
+                                        <Text>Delete Subject</Text>
+                                      </HStack>
                                     </MenuItem>
                                   </MenuList>
                                 </Menu>
                               </HStack>
 
-                              <Box>
-                                <HStack justify="space-between" mb={2}>
-                                  <Text color="gray.500">Progress</Text>
-                                  <Text fontWeight="bold">{course.progress}%</Text>
-                                </HStack>
-                                <Progress 
-                                  value={course.progress} 
-                                  colorScheme="blue" 
-                                  size="lg" 
-                                  borderRadius="full"
-                                />
-                              </Box>
-
-                              <HStack justify="space-between">
-                                <VStack align="start" spacing={1}>
-                                  <Text color="gray.500" fontSize="sm">Target Hours</Text>
-                                  <Text fontWeight="medium">
-                                    {course.dailyStudyTime?.hours || 0}h {course.dailyStudyTime?.minutes || 0}m
-                                  </Text>
-                                </VStack>
-                                <VStack align="end" spacing={1}>
-                                  <Text color="gray.500" fontSize="sm">Streak</Text>
-                                  <Text fontWeight="medium">{course.streak || 0} days</Text>
-                                </VStack>
+                              <HStack spacing={2}>
+                                <Tooltip label={`Difficulty: ${course.difficulty}`}>
+                                  <Badge 
+                                    colorScheme={course.difficulty === 'advanced' ? 'red' : course.difficulty === 'intermediate' ? 'orange' : 'green'}
+                                    variant="subtle"
+                                    px={2}
+                                    py={1}
+                                    borderRadius="full"
+                                    fontSize="xs"
+                                  >
+                                    {course.difficulty}
+                                  </Badge>
+                                </Tooltip>
+                                <Tooltip label={`Priority: ${course.priority}`}>
+                                  <Badge 
+                                    colorScheme={getPriorityColor(course.priority)}
+                                    variant="subtle"
+                                    px={2}
+                                    py={1}
+                                    borderRadius="full"
+                                    fontSize="xs"
+                                  >
+                                    {course.priority}
+                                  </Badge>
+                                </Tooltip>
+                                <Tooltip label={`Category: ${course.category}`}>
+                                  <Badge 
+                                    colorScheme={categories.find(c => c.id === course.category)?.color || 'gray'}
+                                    variant="subtle"
+                                    px={2}
+                                    py={1}
+                                    borderRadius="full"
+                                    fontSize="xs"
+                                  >
+                                    {course.category}
+                                  </Badge>
+                                </Tooltip>
                               </HStack>
 
-                              <ButtonGroup size="sm" isAttached width="full">
-                                <Button 
-                                  flex={1}
-                                  onClick={() => handleUpdateProgress(course.id, Math.max(0, course.progress - 10))}
-                                  isDisabled={course.progress <= 0}
+                              <Box>
+                                <HStack justify="space-between" mb={1}>
+                                  <Tooltip label="Current progress in the subject">
+                                    <Text color="gray.500" fontSize="sm" fontWeight="500">Progress</Text>
+                                  </Tooltip>
+                                  <Text fontSize="sm" fontWeight="600" color={course.progress >= 100 ? 'green.500' : 'gray.700'}>
+                                    {course.progress}%
+                                  </Text>
+                                </HStack>
+                                <Box 
+                                  position="relative" 
+                                  h="4px" 
+                                  bg={useColorModeValue('gray.100', 'gray.700')} 
+                                  borderRadius="full"
+                                  overflow="hidden"
                                 >
-                                  -10%
-                                </Button>
-                                <Button 
-                                  flex={1}
-                                  onClick={() => handleUpdateProgress(course.id, Math.min(100, course.progress + 10))}
-                                  isDisabled={course.progress >= 100}
-                                >
-                                  +10%
-                                </Button>
-                              </ButtonGroup>
+                                  <Box
+                                    position="absolute"
+                                    top="0"
+                                    left="0"
+                                    h="100%"
+                                    w={`${course.progress}%`}
+                                    bg={course.progress >= 100 ? 'green.500' : 'blue.500'}
+                                    transition="width 0.3s ease"
+                                    borderRadius="full"
+                                  />
+                                </Box>
+                                <HStack mt={3} spacing={2} justify="center">
+                                  <Tooltip label="Decrease progress by 10%">
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      colorScheme="blue"
+                                      onClick={() => handleUpdateProgress(course.id, Math.max(0, course.progress - 10))}
+                                      isDisabled={course.progress <= 0}
+                                      _hover={{ bg: useColorModeValue('blue.50', 'blue.900') }}
+                                    >
+                                      -10%
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip label="Increase progress by 10%">
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      colorScheme="blue"
+                                      onClick={() => handleUpdateProgress(course.id, Math.min(100, course.progress + 10))}
+                                      isDisabled={course.progress >= 100}
+                                      _hover={{ bg: useColorModeValue('blue.50', 'blue.900') }}
+                                    >
+                                      +10%
+                                    </Button>
+                                  </Tooltip>
+                                  <Tooltip label="Mark as complete">
+                                    <Button
+                                      size="xs"
+                                      variant="ghost"
+                                      colorScheme="green"
+                                      onClick={() => handleUpdateProgress(course.id, 100)}
+                                      isDisabled={course.progress >= 100}
+                                      _hover={{ bg: useColorModeValue('green.50', 'green.900') }}
+                                    >
+                                      Complete
+                                    </Button>
+                                  </Tooltip>
+                                </HStack>
+                              </Box>
+
+                              <HStack justify="space-between" pt={2}>
+                                <Tooltip label="Estimated study hours">
+                                  <VStack align="start" spacing={0}>
+                                    <Text color="gray.500" fontSize="xs" fontWeight="500">Estimated Hours</Text>
+                                    <Text fontSize="sm" fontWeight="600">
+                                      {course.duration?.hours || 0}h {course.duration?.minutes || 0}m
+                                    </Text>
+                                  </VStack>
+                                </Tooltip>
+                                <Tooltip label={`${course.streak || 0} days of consistent study`}>
+                                  <VStack align="end" spacing={0}>
+                                    <Text color="gray.500" fontSize="xs" fontWeight="500">Streak</Text>
+                                    <HStack spacing={1}>
+                                      <Text fontSize="sm" fontWeight="600">{course.streak || 0} days</Text>
+                                      {course.streak > 0 && <Icon as={FaFire} color="orange.500" />}
+                                    </HStack>
+                                  </VStack>
+                                </Tooltip>
+                              </HStack>
+
+                              {course.description && (
+                                <Box pt={2}>
+                                  <Text fontSize="sm" color="gray.600" noOfLines={2}>
+                                    {course.description}
+                                  </Text>
+                                </Box>
+                              )}
+
+                              {course.topics && course.topics.length > 0 && (
+                                <Wrap spacing={2}>
+                                  {course.topics.map((topic, index) => (
+                                    <WrapItem key={index}>
+                                      <Tag size="sm" variant="subtle" colorScheme="blue">
+                                        {topic}
+                                      </Tag>
+                                    </WrapItem>
+                                  ))}
+                                </Wrap>
+                              )}
                             </VStack>
                           </CardBody>
                         </Card>
-                    ))}
+                      ))}
                   </Grid>
                 </VStack>
               </TabPanel>
@@ -1493,9 +1651,6 @@ const StudyPlan = () => {
                                         <HStack justify="space-between" width="full">
                                           <VStack align="start" spacing={0}>
                                             <Text>{course.name}</Text>
-                                            <Text fontSize="sm" color="gray.500">
-                                              Target: {course.dailyStudyTime?.hours || 0}h {course.dailyStudyTime?.minutes || 0}m
-                                            </Text>
                                           </VStack>
                                           <Badge colorScheme={getPriorityColor(course.priority)}>
                                             {course.priority}
@@ -1567,12 +1722,8 @@ const StudyPlan = () => {
                                     <VStack align="start" spacing={2} flex={1}>
                                       <HStack>
                                         <Heading size="md">{subject.name}</Heading>
-                                        <Badge colorScheme="blue" fontSize="sm">
-                                          {Math.floor(subject.duration / 60)}h {subject.duration % 60}m
-                                        </Badge>
                                       </HStack>
                                       <HStack color="gray.500" fontSize="sm">
-                                        <Icon as={FaClock} />
                                         <Text>{subject.startTime} - {subject.endTime}</Text>
                                       </HStack>
                                     </VStack>
@@ -1647,42 +1798,112 @@ const StudyPlan = () => {
         </Container>
       </Box>
 
-      {/* Add Course Modal */}
-      <Modal isOpen={addCourseModal.isOpen} onClose={addCourseModal.onClose} isCentered>
+      {/* Multi-step Wizard Modal */}
+      <Modal isOpen={addCourseModal.isOpen} onClose={addCourseModal.onClose} size="xl">
         <ModalOverlay />
         <ModalContent>
-          <ModalHeader>Add New Subject</ModalHeader>
+          <ModalHeader>
+            {wizardStep === 1 ? 'Choose Template' :
+             wizardStep === 2 ? 'Subject Details' :
+             'Additional Information'}
+          </ModalHeader>
           <ModalCloseButton />
           <ModalBody>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>Subject Name</FormLabel>
-                <Input
-                  placeholder="Enter subject name"
-                  value={newCourse}
-                  onChange={(e) => setNewCourse(e.target.value)}
-                  autoFocus
-                />
-              </FormControl>
+            {wizardStep === 1 && (
+              <VStack spacing={4} align="stretch">
+                <Text>Choose a template or start from scratch</Text>
+                <SimpleGrid columns={2} spacing={4}>
+                  {subjectTemplates.map(template => (
+                    <Card
+                      key={template.id}
+                      cursor="pointer"
+                      onClick={() => {
+                        setSelectedTemplate(template);
+                        setWizardStep(2);
+                      }}
+                      _hover={{ shadow: 'md' }}
+                    >
+                      <CardBody>
+                        <VStack align="start" spacing={2}>
+                          <Heading size="sm">{template.name}</Heading>
+                          <Text fontSize="sm" color="gray.500">{template.description}</Text>
+                          <HStack>
+                            <Badge>{template.category}</Badge>
+                            <Badge>{template.defaultHours}h</Badge>
+                            <Badge>{template.defaultDifficulty}</Badge>
+                          </HStack>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  ))}
+                  <Card
+                    cursor="pointer"
+                    onClick={() => {
+                      setSelectedTemplate(null);
+                      setWizardStep(2);
+                    }}
+                    _hover={{ shadow: 'md' }}
+                  >
+                    <CardBody>
+                      <VStack align="center" spacing={2}>
+                        <Icon as={FaPlus} boxSize={6} />
+                        <Text>Start from scratch</Text>
+                      </VStack>
+                    </CardBody>
+                  </Card>
+                </SimpleGrid>
+              </VStack>
+            )}
 
-              <FormControl>
-                <FormLabel>Description (Optional)</FormLabel>
-                <Input
-                  placeholder="Enter a short description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                />
-              </FormControl>
+            {wizardStep === 2 && (
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Subject Name</FormLabel>
+                  <Input
+                    placeholder="Enter subject name"
+                    value={newCourse}
+                    onChange={(e) => setNewCourse(e.target.value)}
+                    autoFocus
+                  />
+                </FormControl>
 
-              <FormControl>
-                <FormLabel>Time Wanted (Optional)</FormLabel>
-                <HStack>
+                <FormControl>
+                  <FormLabel>Category</FormLabel>
+                  <HStack spacing={2} overflowX="auto">
+                    {categories.map(category => (
+                      <Button
+                        key={category.id}
+                        size="sm"
+                        variant={selectedCategory === category.id ? 'solid' : 'outline'}
+                        colorScheme={category.color}
+                        leftIcon={<Icon as={FaBook} />}
+                        onClick={() => setSelectedCategory(category.id)}
+                      >
+                        {category.name}
+                      </Button>
+                    ))}
+                  </HStack>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Difficulty Level</FormLabel>
+                  <Select
+                    value={difficulty}
+                    onChange={(e) => setDifficulty(e.target.value as 'beginner' | 'intermediate' | 'advanced')}
+                  >
+                    <option value="beginner">Beginner</option>
+                    <option value="intermediate">Intermediate</option>
+                    <option value="advanced">Advanced</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Estimated Hours</FormLabel>
                   <NumberInput
-                    min={0}
-                    max={24}
+                    min={1}
+                    max={1000}
                     value={duration.hours}
                     onChange={(_, value) => setDuration(prev => ({ ...prev, hours: value }))}
-                    width="120px"
                   >
                     <NumberInputField />
                     <NumberInputStepper>
@@ -1690,259 +1911,100 @@ const StudyPlan = () => {
                       <NumberDecrementStepper />
                     </NumberInputStepper>
                   </NumberInput>
-                  <Text>hours</Text>
-                  <NumberInput
-                    min={0}
-                    max={59}
-                    value={duration.minutes}
-                    onChange={(_, value) => setDuration(prev => ({ ...prev, minutes: value }))}
-                    width="120px"
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Priority</FormLabel>
+                  <Select
+                    value={priority}
+                    onChange={(e) => setPriority(e.target.value as 'high' | 'medium' | 'low')}
                   >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                  <Text>minutes</Text>
-                </HStack>
-              </FormControl>
+                    <option value="high">High</option>
+                    <option value="medium">Medium</option>
+                    <option value="low">Low</option>
+                  </Select>
+                </FormControl>
+              </VStack>
+            )}
 
-              <FormControl>
-                <FormLabel>Difficulty Level (Optional)</FormLabel>
-                <Select
-                  value={difficulty}
-                  onChange={(e) => setDifficulty(e.target.value as 'beginner' | 'intermediate' | 'advanced')}
-                >
-                  <option value="beginner">Beginner</option>
-                  <option value="intermediate">Intermediate</option>
-                  <option value="advanced">Advanced</option>
-                </Select>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Priority (Optional)</FormLabel>
-                <Select
-                  value={priority}
-                  onChange={(e) => setPriority(e.target.value as 'high' | 'medium' | 'low')}
-                >
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
-                </Select>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Start Date (Optional)</FormLabel>
-                <Input
-                  type="date"
-                  value={startDate}
-                  onChange={(e) => setStartDate(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>End Date (Optional)</FormLabel>
-                <Input
-                  type="date"
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Topics/Sub-units (Optional)</FormLabel>
-                <HStack>
-                  <Input
-                    placeholder="Add a topic"
-                    value={newTopic}
-                    onChange={(e) => setNewTopic(e.target.value)}
+            {wizardStep === 3 && (
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel>Description</FormLabel>
+                  <Textarea
+                    placeholder="Enter a description"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
                   />
-                  <Button
-                    onClick={() => {
-                      if (newTopic.trim()) {
-                        setTopics([...topics, newTopic.trim()]);
-                        setNewTopic('');
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
-                </HStack>
-                <VStack align="stretch" mt={2}>
-                  {topics.map((topic, index) => (
-                    <HStack key={index}>
-                      <Text>{topic}</Text>
-                      <Button
-                        size="sm"
-                        colorScheme="red"
-                        variant="ghost"
-                        onClick={() => setTopics(topics.filter((_, i) => i !== index))}
-                      >
-                        Remove
-                      </Button>
-                    </HStack>
-                  ))}
-                </VStack>
-              </FormControl>
+                </FormControl>
 
-              <FormControl>
-                <FormLabel>Daily Study Time (Optional)</FormLabel>
-                <HStack>
-                  <NumberInput
-                    min={0}
-                    max={24}
-                    value={dailyStudyTime.hours}
-                    onChange={(_, value) => setDailyStudyTime(prev => ({ ...prev, hours: value }))}
-                    width="120px"
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                  <Text>hours</Text>
-                  <NumberInput
-                    min={0}
-                    max={59}
-                    value={dailyStudyTime.minutes}
-                    onChange={(_, value) => setDailyStudyTime(prev => ({ ...prev, minutes: value }))}
-                    width="120px"
-                  >
-                    <NumberInputField />
-                    <NumberInputStepper>
-                      <NumberIncrementStepper />
-                      <NumberDecrementStepper />
-                    </NumberInputStepper>
-                  </NumberInput>
-                  <Text>minutes</Text>
-                </HStack>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Study Days (Optional)</FormLabel>
-                <HStack wrap="wrap">
-                  {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day) => (
+                <FormControl>
+                  <FormLabel>Tags</FormLabel>
+                  <HStack>
+                    <Input
+                      placeholder="Add a tag"
+                      value={newTopic}
+                      onChange={(e) => setNewTopic(e.target.value)}
+                    />
                     <Button
-                      key={day}
-                      size="sm"
-                      colorScheme={studyDays.includes(day) ? 'blue' : 'gray'}
                       onClick={() => {
-                        if (studyDays.includes(day)) {
-                          setStudyDays(studyDays.filter(d => d !== day));
-                        } else {
-                          setStudyDays([...studyDays, day]);
+                        if (newTopic.trim()) {
+                          setTopics([...topics, newTopic.trim()]);
+                          setNewTopic('');
                         }
                       }}
                     >
-                      {day}
+                      Add
                     </Button>
-                  ))}
-                </HStack>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Resources (Optional)</FormLabel>
-                <HStack>
-                  <Input
-                    placeholder="Add a resource URL"
-                    value={newResource}
-                    onChange={(e) => setNewResource(e.target.value)}
-                  />
-                  <Button
-                    onClick={() => {
-                      if (newResource.trim()) {
-                        setResources([...resources, newResource.trim()]);
-                        setNewResource('');
-                      }
-                    }}
-                  >
-                    Add
-                  </Button>
-                </HStack>
-                <VStack align="stretch" mt={2}>
-                  {resources.map((resource, index) => (
-                    <HStack key={index}>
-                      <Text>{resource}</Text>
-                      <Button
-                        size="sm"
-                        colorScheme="red"
-                        variant="ghost"
-                        onClick={() => setResources(resources.filter((_, i) => i !== index))}
-                      >
-                        Remove
-                      </Button>
-                    </HStack>
-                  ))}
-                </VStack>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Pomodoro Settings (Optional)</FormLabel>
-                <VStack spacing={2}>
-                  <HStack>
-                    <Text>Work Duration (minutes):</Text>
-                    <NumberInput
-                      min={1}
-                      max={60}
-                      value={pomodoroSettings.workDuration}
-                      onChange={(_, value) => setPomodoroSettings(prev => ({ ...prev, workDuration: value }))}
-                      width="100px"
-                    >
-                      <NumberInputField />
-                      <NumberInputStepper>
-                        <NumberIncrementStepper />
-                        <NumberDecrementStepper />
-                      </NumberInputStepper>
-                    </NumberInput>
                   </HStack>
-                  <HStack>
-                    <Text>Break Duration (minutes):</Text>
-                    <NumberInput
-                      min={1}
-                      max={30}
-                      value={pomodoroSettings.breakDuration}
-                      onChange={(_, value) => setPomodoroSettings(prev => ({ ...prev, breakDuration: value }))}
-                      width="100px"
-                    >
-                      <NumberInputField />
-                      <NumberInputStepper>
-                        <NumberIncrementStepper />
-                        <NumberDecrementStepper />
-                      </NumberInputStepper>
-                    </NumberInput>
-                  </HStack>
-                </VStack>
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Color Tag (Optional)</FormLabel>
-                <Input
-                  type="color"
-                  value={color}
-                  onChange={(e) => setColor(e.target.value)}
-                  width="100px"
-                />
-              </FormControl>
-            </VStack>
+                  <Wrap mt={2}>
+                    {topics.map((topic, index) => (
+                      <WrapItem key={index}>
+                        <Tag
+                          size="md"
+                          borderRadius="full"
+                          variant="solid"
+                          colorScheme="blue"
+                        >
+                          <TagLabel>{topic}</TagLabel>
+                          <TagCloseButton
+                            onClick={() => setTopics(topics.filter((_, i) => i !== index))}
+                          />
+                        </Tag>
+                      </WrapItem>
+                    ))}
+                  </Wrap>
+                </FormControl>
+              </VStack>
+            )}
           </ModalBody>
           <ModalFooter>
-            <Button 
-              colorScheme="blue" 
-              mr={3} 
-              onClick={handleAddCourse}
-              isLoading={isLoading}
-            >
-              Add
-            </Button>
-            <Button 
-              variant="ghost" 
-              onClick={addCourseModal.onClose}
-              isDisabled={isLoading}
-            >
-              Cancel
-            </Button>
+            <ButtonGroup>
+              {wizardStep > 1 && (
+                <Button
+                  variant="ghost"
+                  onClick={() => setWizardStep(wizardStep - 1)}
+                >
+                  Back
+                </Button>
+              )}
+              {wizardStep < 3 ? (
+                <Button
+                  colorScheme="blue"
+                  onClick={() => setWizardStep(wizardStep + 1)}
+                >
+                  Next
+                </Button>
+              ) : (
+                <Button
+                  colorScheme="blue"
+                  onClick={handleAddCourse}
+                  isLoading={isLoading}
+                >
+                  Add Subject
+                </Button>
+              )}
+            </ButtonGroup>
           </ModalFooter>
         </ModalContent>
       </Modal>
