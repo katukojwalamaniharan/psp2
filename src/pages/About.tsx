@@ -29,28 +29,22 @@ const About = () => {
 
   const teamMembers = [
     {
-      name: "Alex Chen",
+      name: "Maniharan",
+      role: "Backend Developer",
+      initials: "M",
+      bio: "Builds robust backend systems and ensures data flows smoothly."
+    },
+    {
+      name: "Rakesh",
       role: "Frontend Developer",
-      initials: "AC",
-      bio: "Passionate about creating intuitive user interfaces and smooth user experiences."
+      initials: "R",
+      bio: "Crafts interactive and responsive user interfaces."
     },
     {
-      name: "Sarah Kumar",
-      role: "Backend Developer", 
-      initials: "SK",
-      bio: "Specializes in scalable architecture and database optimization for student apps."
-    },
-    {
-      name: "Jordan Smith",
-      role: "UX Designer",
-      initials: "JS",
-      bio: "Focuses on user-centered design to make studying more engaging and productive."
-    },
-    {
-      name: "Maya Patel",
-      role: "Full-Stack Developer",
-      initials: "MP",
-      bio: "Bridges frontend and backend to create seamless learning experiences."
+      name: "Yadidya",
+      role: "UI/UX Designer",
+      initials: "Y",
+      bio: "Designs intuitive and delightful user experiences."
     }
   ];
 
@@ -146,8 +140,8 @@ const About = () => {
                 <div className="w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-4">
                   <BookOpen className="h-8 w-8 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold mb-2">Final Year Project</h3>
-                <p className="text-muted-foreground">A comprehensive full-stack application built as our Computer Science Engineering capstone project.</p>
+                <h3 className="text-xl font-semibold mb-2">Real Time Project</h3>
+                <p className="text-muted-foreground">A comprehensive full-stack application built as a real time project for practical learning and impact.</p>
               </CardContent>
             </Card>
             <Card className="text-center hover:shadow-lg transition-shadow">
@@ -156,7 +150,7 @@ const About = () => {
                   <Users className="h-8 w-8 text-white" />
                 </div>
                 <h3 className="text-xl font-semibold mb-2">By Students</h3>
-                <p className="text-muted-foreground">Created by passionate CSE students who understand the real challenges of academic life.</p>
+                <p className="text-muted-foreground">Created by passionate IT students who understand the real challenges of academic life.</p>
               </CardContent>
             </Card>
             <Card className="text-center hover:shadow-lg transition-shadow">
@@ -176,7 +170,7 @@ const About = () => {
       <section className="py-20 bg-white/50">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 className="text-3xl md:text-4xl font-bold text-center mb-16">Meet the Team</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
+          <div className="flex flex-wrap justify-center gap-8">
             {teamMembers.map((member, index) => (
               <Card key={index} className="group hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
                 <CardContent className="p-6 text-center">
@@ -234,15 +228,21 @@ const About = () => {
             Have questions, feedback, or just want to say hello? We'd love to hear from you!
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Button size="lg" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
-              <Mail className="mr-2 h-5 w-5" /> Email Us
-            </Button>
-            <Button size="lg" variant="outline" className="border-gray-800 text-gray-800 hover:bg-gray-100">
-              <Github className="mr-2 h-5 w-5" /> GitHub
-            </Button>
-            <Button size="lg" variant="outline" className="border-blue-700 text-blue-700 hover:bg-blue-50">
-              <Linkedin className="mr-2 h-5 w-5" /> LinkedIn
-            </Button>
+            <a href="mailto:katukojwalamaniharanchary@gmail.com" target="_blank" rel="noopener noreferrer">
+              <Button size="lg" variant="outline" className="border-blue-600 text-blue-600 hover:bg-blue-50">
+                <Mail className="mr-2 h-5 w-5" /> Email Us
+              </Button>
+            </a>
+            <a href="tel:+919550684413">
+              <Button size="lg" variant="outline" className="border-green-600 text-green-600 hover:bg-green-50">
+                📞 Call Us: +91 9550684413
+              </Button>
+            </a>
+            <a href="https://www.linkedin.com/in/maniharanchary-katukojwala-22798a27a/" target="_blank" rel="noopener noreferrer">
+              <Button size="lg" variant="outline" className="border-blue-700 text-blue-700 hover:bg-blue-50">
+                <Linkedin className="mr-2 h-5 w-5" /> LinkedIn
+              </Button>
+            </a>
           </div>
         </div>
       </section>

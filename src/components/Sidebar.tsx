@@ -83,28 +83,36 @@ const Sidebar = () => {
 
       {/* Navigation */}
       <VStack spacing={2} w="full" px={4}>
-        {menuItems.map((item) => (
-          <Link
-            key={item.path}
-            as={RouterLink}
-            to={item.path}
-            w="full"
-            _hover={{ textDecoration: 'none' }}
-          >
-            <HStack
+        {menuItems.map((item) => {
+          // Hide Schedule and Progress visually only
+          if (item.label === 'Schedule' || item.label === 'Progress') {
+            return (
+              <Box key={item.path} display="none" />
+            );
+          }
+          return (
+            <Link
+              key={item.path}
+              as={RouterLink}
+              to={item.path}
               w="full"
-              p={3}
-              borderRadius="lg"
-              bg={isActive(item.path) ? 'blue.50' : 'transparent'}
-              color={isActive(item.path) ? 'blue.500' : 'gray.600'}
-              _hover={{ bg: hoverBg }}
-              transition="all 0.2s"
+              _hover={{ textDecoration: 'none' }}
             >
-              <Icon as={item.icon} />
-              <Text>{item.label}</Text>
-            </HStack>
-          </Link>
-        ))}
+              <HStack
+                w="full"
+                p={3}
+                borderRadius="lg"
+                bg={isActive(item.path) ? 'blue.50' : 'transparent'}
+                color={isActive(item.path) ? 'blue.500' : 'gray.600'}
+                _hover={{ bg: hoverBg }}
+                transition="all 0.2s"
+              >
+                <Icon as={item.icon} />
+                <Text>{item.label}</Text>
+              </HStack>
+            </Link>
+          );
+        })}
       </VStack>
 
       {/* User Profile */}
